@@ -3,6 +3,7 @@ from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 import numpy as np
 import cv2
+import math
 
 
 
@@ -119,6 +120,9 @@ def line_intersection(line1, line2):
     x = (line1[2]*line2[1] - line1[1]*line2[2]) / (line1[1] * line2[0] - line1[0] * line2[1])
     return np.array([x, y])
 
+def distance(plane, point):
+    return abs(plane[0] * point[0] + plane[1] * point[1] + plane[2] * point[2] + plane[3]) / math.sqrt(plane[0] * plane[0] + plane[1] * plane[1] + plane[2] * plane[2])
+
 if __name__ == '__main__':
     np.set_printoptions(precision=4,linewidth=1024,suppress=True)
 
@@ -228,9 +232,16 @@ if __name__ == '__main__':
     
     # PART 3
 
-    # X_w = np.hstack((X_A_h,X_B_h,X_C_h,X_D_h)) 
     X_w = np.array((X_A_h,X_B_h,X_C_h,X_D_h))
     A = (X_w[:,0:4])
     U, s, vh = np.linalg.svd(A)
     plane = np.reshape(vh[-1,:],(4,1))
+    
+    plane = plane.reshape(4)
     print(plane)
+
+    print(distance(plane,X_A))
+    print(distance(plane,X_B))
+    print(distance(plane,X_C))
+    print(distance(plane,X_D))
+    print(distance(plane,X_E))
