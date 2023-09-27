@@ -99,7 +99,7 @@ def drawRefSystem(ax, T_w_c, strStyle, nameStr):
     draw3DLine(ax, T_w_c[0:3, 3:4], T_w_c[0:3, 3:4] + T_w_c[0:3, 2:3], strStyle, 'b', 1)
     ax.text(np.squeeze( T_w_c[0, 3]+0.1), np.squeeze( T_w_c[1, 3]+0.1), np.squeeze( T_w_c[2, 3]+0.1), nameStr)
 
-def drawLine(l,strFormat,lWidth):
+def drawLine(l,strFormat,lWidth, label=""):
     """
     Draw a line
     -input:
@@ -113,7 +113,7 @@ def drawLine(l,strFormat,lWidth):
     # p_l_x is the intersection point of the line with the axis X (y=0)
     p_l_x = np.array([-l[2] / l[0], 0])
     # Draw the line segment p_l_x to  p_l_y
-    plt.plot([p_l_y[0], p_l_x[0]], [p_l_y[1], p_l_x[1]], strFormat, linewidth=lWidth)
+    plt.plot([p_l_y[0], p_l_x[0]], [p_l_y[1], p_l_x[1]], strFormat, linewidth=lWidth, label=label)
 
 def line_intersection(line1, line2):
     y = (line1[0] * line2[2] - line1[2]*line2[0]) / (line1[1]*line2[0]-line1[0]*line2[1])
@@ -122,6 +122,12 @@ def line_intersection(line1, line2):
 
 def distance(plane, point):
     return abs(plane[0] * point[0] + plane[1] * point[1] + plane[2] * point[2] + plane[3]) / math.sqrt(plane[0] * plane[0] + plane[1] * plane[1] + plane[2] * plane[2])
+
+def plotPoint(point, label):
+    plt.plot(point[0], point[1], '+r')
+    plt.annotate(label,(point[0], point[1]), color='r',textcoords="offset points", # how to position the text
+                 xytext=(0,5), # distance from text to points (x,y)
+                 ha='center')
 
 if __name__ == '__main__':
     np.set_printoptions(precision=4,linewidth=1024,suppress=True)
@@ -214,6 +220,12 @@ if __name__ == '__main__':
     img1 = cv2.cvtColor(cv2.imread("Image1.jpg"), cv2.COLOR_BGR2RGB)
     plt.figure(1)
     plt.imshow(img1)
+    plotPoint(X_A_c1,'A')
+    plotPoint(X_B_c1, 'B')
+    plotPoint(X_C_c1,'C')
+    plotPoint(X_D_c1, 'D')
+    plotPoint(X_E_c1, 'E')
+   
     drawLine(line_ab_c1,'g-',1)
     drawLine(line_cd_c1,'g-',1)
     plt.plot(p_12_c1[0], p_12_c1[1], marker="o", markersize=2,  markerfacecolor="blue")
@@ -223,6 +235,11 @@ if __name__ == '__main__':
     img2 = cv2.cvtColor(cv2.imread("Image2.jpg"), cv2.COLOR_BGR2RGB)
     plt.figure(2)
     plt.imshow(img2)
+    plotPoint(X_A_c2,'A')
+    plotPoint(X_B_c2, 'B')
+    plotPoint(X_C_c2,'C')
+    plotPoint(X_D_c2, 'D')
+    plotPoint(X_E_c2, 'E')
     drawLine(line_ab_c2,'g-',1)
     drawLine(line_cd_c2,'g-',1)
     plt.plot(p_12_c2[0], p_12_c2[1], marker="o", markersize=2,  markerfacecolor="blue")
