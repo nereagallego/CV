@@ -1,5 +1,3 @@
-from mpl_toolkits.mplot3d import Axes3D
-
 import matplotlib.pyplot as plt
 import numpy as np
 import cv2
@@ -114,9 +112,7 @@ def drawLine(l,strFormat,lWidth, label=""):
     p_l_x = np.array([-l[2] / l[0], 0])
     # Draw the line segment p_l_x to  p_l_y
     plt.plot([p_l_y[0], p_l_x[0]], [p_l_y[1], p_l_x[1]], strFormat, linewidth=lWidth)
-    plt.annotate(label,(point[0], point[1]), color='r',textcoords="offset points", # how to position the text
-                 xytext=(0,5), # distance from text to points (x,y)
-                 ha='center')
+   
 
 def line_intersection(line1, line2):
     y = (line1[0] * line2[2] - line1[2]*line2[0]) / (line1[1]*line2[0]-line1[0]*line2[1])
