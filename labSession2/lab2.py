@@ -254,10 +254,10 @@ def decompose_essential_matrix(E):
     solutions.append((U @ W @ V, -U[:, 2], V[:, 2]))
     solutions.append((U @ W.T @ V, U[:, 2], -V[:, 2]))
     solutions.append((U @ W.T @ V, -U[:, 2], -V[:, 2]))
-    
-    
 
-    
+    return solutions
+
+   
 if __name__ == '__main__':
     np.set_printoptions(precision=4,linewidth=1024,suppress=True)
 
@@ -427,6 +427,7 @@ if __name__ == '__main__':
     print("PART 2.4")
 
     E_21 = compute_essential_matrix(F_21, K_c)
+    
     
     
     
