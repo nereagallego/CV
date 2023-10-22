@@ -151,18 +151,23 @@ def triangulation(P1, P2, points1, points2, worldPoints):
     """
 def compute_fundamental_matrix_from_poses(T_c1_w, T_c2_w):
     # Compute the essential matrix
-    R_c1_w = T_c1_w[0:3, 0:3]
-    t_c1_w = T_c1_w[0:3, 3:4]
-    R_c2_w = T_c2_w[0:3, 0:3]
-    t_c2_w = T_c2_w[0:3, 3:4]
-    R_c2_c1 = np.dot(R_c2_w, R_c1_w.T)
-    t_c2_c1 = t_c2_w - np.dot(R_c2_w, R_c1_w.T)
-    t_c2_c1_x = np.array([[0, -t_c2_c1[2], t_c2_c1[1]], [t_c2_c1[2], 0, -t_c2_c1[0]], [-t_c2_c1[1], t_c2_c1[0], 0]], dtype=np.float32)
-    E = np.dot(t_c2_c1_x, R_c2_c1)
+    T_c2_c1 = np.dot(T_c2_w, np.linalg.inv(T_c1_w))
+    R_c2_c1 = T_c2_c1[0:3, 0:3]
+    t_c2_c1 = T_c2_c1[0:3, 3]
+    t_c2_c1_x = np.array([[0, -t_c2_c1[2], t_c2_c1[1]], [t_c2_c1[2], 0, -t_c2_c1[0]], [-t_c2_c1[1], t_c2_c1[0], 0]])
+    E = t_c2_c1_x @ R_c2_c1
     # Compute the fundamental matrix
     K_c = np.loadtxt('K_c.txt')
-    F = np.dot(np.dot(np.linalg.inv(K_c).T, E), np.linalg.inv(K_c))
-    return F
+    F = np.dot(np.linalg.inv(K_c).T, E) @ np.linalg.inv(K_c)
+    return F/F[2,2]
+
+# Compute the epipole from the fundamental matrix
+def compute_epipole(F):
+    # Compute the epipole
+    _, _, V = np.linalg.svd(F)
+    e = V[-1, :]
+    e = e / e[-1]
+    return e
 
 
 def compute_fundamental_matrix(points1, points2):
@@ -178,6 +183,14 @@ def compute_fundamental_matrix(points1, points2):
     F = V[-1, :].reshape(3, 3)
 
     return F/F[2,2]
+
+def show_part22(img1, img2, T_c1_w, T_c2_w):
+    F_22 = compute_fundamental_matrix_from_poses(T_c1_w, T_c2_w)
+    epipole_22 = compute_epipole(F_22)
+
+    clicked_coordinates = []
+
+    cv2.imshow
 
 
 def compute_epipolar_line(x1, F):
@@ -199,7 +212,7 @@ clicked_coordinates = []
 def mouse_callback(event, x, y, flags, param):
     if event == cv2.EVENT_LBUTTONDOWN:
         clicked_coordinates.append((x, y))
-        print(f"Clicked at pixel coordinates: ({x}, {y})")
+        # print(f"Clicked at pixel coordinates: ({x}, {y})")
 
 
 def plotPoint(point, label):
@@ -223,6 +236,26 @@ def drawLine(l,strFormat,lWidth, label=""):
     p_l_x = np.array([-l[2] / l[0], 0])
     # Draw the line segment p_l_x to  p_l_y
     plt.plot([p_l_y[0], p_l_x[0]], [p_l_y[1], p_l_x[1]], strFormat, linewidth=lWidth)
+
+# Compute the Essential matrix from Fundamental matrix
+def compute_essential_matrix(F, K):
+    E = K.T @ F @ K
+    return E/E[2,2]
+
+# Decompose the Essential matrix
+def decompose_essential_matrix(E):
+    # Compute the SVD of the essential matrix
+    U, _, V = np.linalg.svd(E)
+    W = np.array([[0, -1, 0], [1, 0, 0], [0, 0, 1]])
+
+    # Compute the four possible solutions
+    solutions = []
+    solutions.append((U @ W @ V, U[:, 2], V[:, 2]))
+    solutions.append((U @ W @ V, -U[:, 2], V[:, 2]))
+    solutions.append((U @ W.T @ V, U[:, 2], -V[:, 2]))
+    solutions.append((U @ W.T @ V, -U[:, 2], -V[:, 2]))
+    
+    
 
     
 if __name__ == '__main__':
@@ -292,45 +325,74 @@ if __name__ == '__main__':
             cv2.line(img2, (0,y), (x,0),(255,0,0), 2)
         
         if cv2.waitKey(10) & 0xFF == 27:  # Break the loop on ESC key
+            # close all open windows
+            cv2.destroyAllWindows()
             break
     
-    # # PART 2.2
-    # print("PART 2.2")
-    # F_22 = compute_fundamental_matrix_from_poses(T_c1_w, T_c2_w)
-    # print(F_22)
+    # PART 2.2
+    print("PART 2.2")
+    F_22 = compute_fundamental_matrix_from_poses(T_c1_w, T_c2_w)
+    print(F_22)
+    epipole_22 = compute_epipole(F_22)
+    print(epipole_22)
 
-    # while True:
-    #     # conc = np.concatenate((img1, img2), axis=1)
-    #     # Display the resulting frame
-    #     cv2.imshow('Image 1', img1)
-    #     plt.figure(1)
-    #     plt.imshow(img1)
+    
+    img1 = cv2.cvtColor(cv2.imread("image1.png"), cv2.COLOR_BGR2RGB)
+    img2 = cv2.cvtColor(cv2.imread("image2.png"), cv2.COLOR_BGR2RGB)
 
-    #     for i in range(len(clicked_coordinates)):
-    #         cv2.circle(img1, clicked_coordinates[i], 5, (0, 0, 255), -1)
-    #         # plotPoint(clicked_coordinates[i], str(i))
+    
 
-    #     cv2.setMouseCallback('Image 1', mouse_callback)
+    clicked_coordinates = []
 
-    #     plt.draw()
+    while True:
+        # conc = np.concatenate((img1, img2), axis=1)
+        # Display the resulting frame
+        cv2.imshow('Image 1', img1)
+        plt.figure(1)
+        plt.imshow(img1)
 
-    #     cv2.imshow('Image 2', img2)
+        for i in range(len(clicked_coordinates)):
+            cv2.circle(img1, clicked_coordinates[i], 5, (0, 0, 255), -1)
+            # plotPoint(clicked_coordinates[i], str(i))
 
-    #     for i in range(len(clicked_coordinates)):
-    #         line = compute_epipolar_line(clicked_coordinates[i], F_22)
-    #         # drawLine(line, colors[i], 1)
-    #         y = int(-line[2]/line[0])
-    #         x = int(-line[2]/line[1])
-    #         cv2.line(img2, (0,y), (x,0),(255,0,0), 2)
+        cv2.setMouseCallback('Image 1', mouse_callback)
+
+        plt.draw()
+
+        cv2.imshow('Image 2', img2)
+
+        for i in range(len(clicked_coordinates)):
+            line = compute_epipolar_line(clicked_coordinates[i], F_22)
+            # drawLine(line, colors[i], 1)
+            y = int(-line[2]/line[0])
+            x = int(-line[2]/line[1])
+            cv2.line(img2, (0,y), (x,0),(255,0,0), 2)
+
+        # Create a larger canvas to accommodate the point
+        canvas_width, canvas_height = max(img2.shape[0], epipole_22[0] + 1), max(img2.shape[1], epipole_22[1] + 1)
+        canvas = np.zeros((canvas_height, canvas_width, 3), dtype=np.uint8)
+
+        # Copy the original image onto the canvas
+        canvas[0:img2.shape[0], 0:img2.shape[1]] = img2
         
-    #     if cv2.waitKey(10) & 0xFF == 27:  # Break the loop on ESC key
-    #         break
+        # Draw the epipole
+        cv2.circle(canvas, (int(epipole_22[0]), int(epipole_22[1])), 5, (0, 0, 255), -1)
+
+        if cv2.waitKey(10) & 0xFF == 27:  # Break the loop on ESC key
+            # close all open windows
+            cv2.destroyAllWindows()
+            break
     
 
     # PART 2.3
     print("PART 2.3")
     F_23 = compute_fundamental_matrix(points1, points2)
     print(F_23)
+
+    img1 = cv2.cvtColor(cv2.imread("image1.png"), cv2.COLOR_BGR2RGB)
+    img2 = cv2.cvtColor(cv2.imread("image2.png"), cv2.COLOR_BGR2RGB)
+
+    clicked_coordinates = []
 
     while True:
         # conc = np.concatenate((img1, img2), axis=1)
@@ -357,7 +419,14 @@ if __name__ == '__main__':
             cv2.line(img2, (0,y), (x,0),(255,0,0), 2)
         
         if cv2.waitKey(10) & 0xFF == 27:  # Break the loop on ESC key
+            # close all open windows
+            cv2.destroyAllWindows()
             break
+
+    # PART 2.4
+    print("PART 2.4")
+
+    E_21 = compute_essential_matrix(F_21, K_c)
     
     
     
