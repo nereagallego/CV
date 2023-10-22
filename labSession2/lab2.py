@@ -157,7 +157,7 @@ def compute_fundamental_matrix_from_poses(T_c1_w, T_c2_w):
     t_c2_w = T_c2_w[0:3, 3:4]
     R_c2_c1 = np.dot(R_c2_w, R_c1_w.T)
     t_c2_c1 = t_c2_w - np.dot(R_c2_w, R_c1_w.T)
-    t_c2_c1_x = np.array([np.array([0, -t_c2_c1[2], t_c2_c1[1]]), np.array([t_c2_c1[2], 0, -t_c2_c1[0]]), np.array([-t_c2_c1[1], t_c2_c1[0], 0])])
+    t_c2_c1_x = np.array([[0, -t_c2_c1[2], t_c2_c1[1]], [t_c2_c1[2], 0, -t_c2_c1[0]], [-t_c2_c1[1], t_c2_c1[0], 0]], dtype=np.float32)
     E = np.dot(t_c2_c1_x, R_c2_c1)
     # Compute the fundamental matrix
     K_c = np.loadtxt('K_c.txt')
@@ -294,42 +294,43 @@ if __name__ == '__main__':
         if cv2.waitKey(10) & 0xFF == 27:  # Break the loop on ESC key
             break
     
-    # PART 2.2
-    print("PART 2.2")
-    F_22 = compute_fundamental_matrix_from_poses(T_c1_w, T_c2_w)
-    print(F_22)
+    # # PART 2.2
+    # print("PART 2.2")
+    # F_22 = compute_fundamental_matrix_from_poses(T_c1_w, T_c2_w)
+    # print(F_22)
 
-    while True:
-        # conc = np.concatenate((img1, img2), axis=1)
-        # Display the resulting frame
-        cv2.imshow('Image 1', img1)
-        plt.figure(1)
-        plt.imshow(img1)
+    # while True:
+    #     # conc = np.concatenate((img1, img2), axis=1)
+    #     # Display the resulting frame
+    #     cv2.imshow('Image 1', img1)
+    #     plt.figure(1)
+    #     plt.imshow(img1)
 
-        for i in range(len(clicked_coordinates)):
-            cv2.circle(img1, clicked_coordinates[i], 5, (0, 0, 255), -1)
-            # plotPoint(clicked_coordinates[i], str(i))
+    #     for i in range(len(clicked_coordinates)):
+    #         cv2.circle(img1, clicked_coordinates[i], 5, (0, 0, 255), -1)
+    #         # plotPoint(clicked_coordinates[i], str(i))
 
-        cv2.setMouseCallback('Image 1', mouse_callback)
+    #     cv2.setMouseCallback('Image 1', mouse_callback)
 
-        plt.draw()
+    #     plt.draw()
 
-        cv2.imshow('Image 2', img2)
+    #     cv2.imshow('Image 2', img2)
 
-        for i in range(len(clicked_coordinates)):
-            line = compute_epipolar_line(clicked_coordinates[i], F_22)
-            # drawLine(line, colors[i], 1)
-            y = int(-line[2]/line[0])
-            x = int(-line[2]/line[1])
-            cv2.line(img2, (0,y), (x,0),(255,0,0), 2)
+    #     for i in range(len(clicked_coordinates)):
+    #         line = compute_epipolar_line(clicked_coordinates[i], F_22)
+    #         # drawLine(line, colors[i], 1)
+    #         y = int(-line[2]/line[0])
+    #         x = int(-line[2]/line[1])
+    #         cv2.line(img2, (0,y), (x,0),(255,0,0), 2)
         
-        if cv2.waitKey(10) & 0xFF == 27:  # Break the loop on ESC key
-            break
+    #     if cv2.waitKey(10) & 0xFF == 27:  # Break the loop on ESC key
+    #         break
     
 
     # PART 2.3
     print("PART 2.3")
     F_23 = compute_fundamental_matrix(points1, points2)
+    print(F_23)
 
     while True:
         # conc = np.concatenate((img1, img2), axis=1)
