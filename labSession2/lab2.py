@@ -184,13 +184,53 @@ def compute_fundamental_matrix(points1, points2):
 
     return F/F[2,2]
 
-def show_part22(img1, img2, T_c1_w, T_c2_w):
-    F_22 = compute_fundamental_matrix_from_poses(T_c1_w, T_c2_w)
-    epipole_22 = compute_epipole(F_22)
+def show_epipolar_lines(img1, img2, T_c1_w, T_c2_w, F):
 
-    clicked_coordinates = []
+    # Compute the epipole
+    epipole = compute_epipole(F)
 
-    cv2.imshow
+    fig1, ax1 = plt.subplots()
+    fig2, ax2 = plt.subplots()
+
+    ax1.imshow(img1)
+    ax2.imshow(img2)
+
+    plt.show(block=False) 
+
+    print('Click on the figure to select points...')
+    i = 0
+    while i < 8:
+        # Wait for the user to click on the figure
+        clicked_point = fig1.ginput(n=1, timeout=0)
+        print(clicked_point)
+        ax1.scatter(clicked_point[0][0], clicked_point[0][1], c='r', s=40)
+        fig1.canvas.draw()
+
+        # Compute the epipolar line
+        x1 = np.array([clicked_point[0][0], clicked_point[0][1]])
+        line = compute_epipolar_line(x1, F)
+        y = int(-line[2]/line[0])
+        x = int(-line[2]/line[1])
+        ax2.plot([0, x], [y, 0], c='b', linewidth=1)
+        fig2.canvas.draw()
+
+        i += 1
+
+    #Draw the epipole
+    ax2.scatter(epipole[0], epipole[1], c='g', s=40)
+    fig2.canvas.draw()
+    
+    # Add key press event handler to close figures on ESC key press
+    def on_key_press(event):
+        if event.key == 'escape':
+            plt.close(fig1)
+            plt.close(fig2)
+
+    fig1.canvas.mpl_connect('key_press_event', on_key_press)
+    fig2.canvas.mpl_connect('key_press_event', on_key_press)
+    
+    print('Press ESC to close the figures...')
+    plt.show(block=True)
 
 
 def compute_epipolar_line(x1, F):
@@ -289,7 +329,6 @@ if __name__ == '__main__':
     #PART 2
 
     F_21 = np.loadtxt('F_21_test.txt')
-    print(F_21)
     
     # Global variables to store coordinates
     current = -1
@@ -332,56 +371,13 @@ if __name__ == '__main__':
     # PART 2.2
     print("PART 2.2")
     F_22 = compute_fundamental_matrix_from_poses(T_c1_w, T_c2_w)
-    print(F_22)
-    epipole_22 = compute_epipole(F_22)
-    print(epipole_22)
 
-    
     img1 = cv2.cvtColor(cv2.imread("image1.png"), cv2.COLOR_BGR2RGB)
     img2 = cv2.cvtColor(cv2.imread("image2.png"), cv2.COLOR_BGR2RGB)
 
     
+    show_epipolar_lines(img1, img2, T_c1_w, T_c2_w, F_22)
 
-    clicked_coordinates = []
-
-    while True:
-        # conc = np.concatenate((img1, img2), axis=1)
-        # Display the resulting frame
-        cv2.imshow('Image 1', img1)
-        plt.figure(1)
-        plt.imshow(img1)
-
-        for i in range(len(clicked_coordinates)):
-            cv2.circle(img1, clicked_coordinates[i], 5, (0, 0, 255), -1)
-            # plotPoint(clicked_coordinates[i], str(i))
-
-        cv2.setMouseCallback('Image 1', mouse_callback)
-
-        plt.draw()
-
-        cv2.imshow('Image 2', img2)
-
-        for i in range(len(clicked_coordinates)):
-            line = compute_epipolar_line(clicked_coordinates[i], F_22)
-            # drawLine(line, colors[i], 1)
-            y = int(-line[2]/line[0])
-            x = int(-line[2]/line[1])
-            cv2.line(img2, (0,y), (x,0),(255,0,0), 2)
-
-        # Create a larger canvas to accommodate the point
-        canvas_width, canvas_height = max(img2.shape[0], epipole_22[0] + 1), max(img2.shape[1], epipole_22[1] + 1)
-        canvas = np.zeros((canvas_height, canvas_width, 3), dtype=np.uint8)
-
-        # Copy the original image onto the canvas
-        canvas[0:img2.shape[0], 0:img2.shape[1]] = img2
-        
-        # Draw the epipole
-        cv2.circle(canvas, (int(epipole_22[0]), int(epipole_22[1])), 5, (0, 0, 255), -1)
-
-        if cv2.waitKey(10) & 0xFF == 27:  # Break the loop on ESC key
-            # close all open windows
-            cv2.destroyAllWindows()
-            break
     
 
     # PART 2.3
