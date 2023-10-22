@@ -171,8 +171,7 @@ def compute_epipole(F):
 
 
 def compute_fundamental_matrix(points1, points2):
-    # print(points1.shape)
-    # print(points2.shape)
+    """_summary_ neew to check this"""
     # Compute the fundamental matrix
     A = np.zeros((points1.shape[1], 9))
     for i in range(points1.shape[1]):
@@ -184,8 +183,8 @@ def compute_fundamental_matrix(points1, points2):
 
     return F/F[2,2]
 
-def show_epipolar_lines(img1, img2, T_c1_w, T_c2_w, F):
-
+def show_epipolar_lines_manual(img1, img2, T_c1_w, T_c2_w, F):
+    
     # Compute the epipole
     epipole = compute_epipole(F)
 
@@ -231,6 +230,51 @@ def show_epipolar_lines(img1, img2, T_c1_w, T_c2_w, F):
     
     print('Press ESC to close the figures...')
     plt.show(block=True)
+
+
+def show_epipolar_lines_points(img1, img2, T_c1_w, T_c2_w, F, points1, points2):
+    print("TODO")
+    # # Compute the epipole
+    # epipole = compute_epipole(F)
+
+    # fig1, ax1 = plt.subplots()
+    # fig2, ax2 = plt.subplots()
+
+    # ax1.imshow(img1)
+    # ax2.imshow(img2)
+
+    # plt.show(block=False) 
+
+    # for i in range(points1.shape[1]):
+
+    #     ax1.scatter(points1, points2, c='r', s=10)
+    #     fig1.canvas.draw()
+
+    #     # Compute the epipolar line
+    #     x1 = np.array([clicked_point[0][0], clicked_point[0][1]])
+    #     line = compute_epipolar_line(x1, F)
+    #     y = int(-line[2]/line[0])
+    #     x = int(-line[2]/line[1])
+    #     ax2.plot([0, x], [y, 0], c='b', linewidth=1)
+    #     fig2.canvas.draw()
+
+    #     i += 1
+
+    # #Draw the epipole
+    # ax2.scatter(epipole[0], epipole[1], c='g', s=40)
+    # fig2.canvas.draw()
+    
+    # # Add key press event handler to close figures on ESC key press
+    # def on_key_press(event):
+    #     if event.key == 'escape':
+    #         plt.close(fig1)
+    #         plt.close(fig2)
+
+    # fig1.canvas.mpl_connect('key_press_event', on_key_press)
+    # fig2.canvas.mpl_connect('key_press_event', on_key_press)
+    
+    # print('Press ESC to close the figures...')
+    # plt.show(block=True)
 
 
 def compute_epipolar_line(x1, F):
@@ -328,45 +372,13 @@ if __name__ == '__main__':
 
     #PART 2
 
+    print("PART 2.2")
     F_21 = np.loadtxt('F_21_test.txt')
-    
-    # Global variables to store coordinates
-    current = -1
 
     img1 = cv2.cvtColor(cv2.imread("image1.png"), cv2.COLOR_BGR2RGB)
     img2 = cv2.cvtColor(cv2.imread("image2.png"), cv2.COLOR_BGR2RGB)
 
-
-    colors = ['blue', 'red', 'green', 'black', 'orange', 'grey', 'purple', 'brown', 'pink', 'cyan', 'magenta', 'yellow',  'violet', 'indigo', 'lightblue']
-
-    while True:
-        # conc = np.concatenate((img1, img2), axis=1)
-        # Display the resulting frame
-        cv2.imshow('Image 1', img1)
-        plt.figure(1)
-        plt.imshow(img1)
-
-        for i in range(len(clicked_coordinates)):
-            cv2.circle(img1, clicked_coordinates[i], 5, (0, 0, 255), -1)
-            # plotPoint(clicked_coordinates[i], str(i))
-
-        cv2.setMouseCallback('Image 1', mouse_callback)
-
-        plt.draw()
-
-        cv2.imshow('Image 2', img2)
-
-        for i in range(len(clicked_coordinates)):
-            line = compute_epipolar_line(clicked_coordinates[i], F_21)
-            # drawLine(line, colors[i], 1)
-            y = int(-line[2]/line[0])
-            x = int(-line[2]/line[1])
-            cv2.line(img2, (0,y), (x,0),(255,0,0), 2)
-        
-        if cv2.waitKey(10) & 0xFF == 27:  # Break the loop on ESC key
-            # close all open windows
-            cv2.destroyAllWindows()
-            break
+    show_epipolar_lines_manual(img1, img2, T_c1_w, T_c2_w, F_21)
     
     # PART 2.2
     print("PART 2.2")
@@ -375,49 +387,18 @@ if __name__ == '__main__':
     img1 = cv2.cvtColor(cv2.imread("image1.png"), cv2.COLOR_BGR2RGB)
     img2 = cv2.cvtColor(cv2.imread("image2.png"), cv2.COLOR_BGR2RGB)
 
-    
-    show_epipolar_lines(img1, img2, T_c1_w, T_c2_w, F_22)
+    show_epipolar_lines_manual(img1, img2, T_c1_w, T_c2_w, F_22)
 
     
 
     # PART 2.3
     print("PART 2.3")
     F_23 = compute_fundamental_matrix(points1, points2)
-    print(F_23)
 
     img1 = cv2.cvtColor(cv2.imread("image1.png"), cv2.COLOR_BGR2RGB)
     img2 = cv2.cvtColor(cv2.imread("image2.png"), cv2.COLOR_BGR2RGB)
 
-    clicked_coordinates = []
-
-    while True:
-        # conc = np.concatenate((img1, img2), axis=1)
-        # Display the resulting frame
-        cv2.imshow('Image 1', img1)
-        plt.figure(1)
-        plt.imshow(img1)
-
-        for i in range(len(clicked_coordinates)):
-            cv2.circle(img1, clicked_coordinates[i], 5, (0, 0, 255), -1)
-            # plotPoint(clicked_coordinates[i], str(i))
-
-        cv2.setMouseCallback('Image 1', mouse_callback)
-
-        plt.draw()
-
-        cv2.imshow('Image 2', img2)
-
-        for i in range(len(clicked_coordinates)):
-            line = compute_epipolar_line(clicked_coordinates[i], F_23)
-            # drawLine(line, colors[i], 1)
-            y = int(-line[2]/line[0])
-            x = int(-line[2]/line[1])
-            cv2.line(img2, (0,y), (x,0),(255,0,0), 2)
-        
-        if cv2.waitKey(10) & 0xFF == 27:  # Break the loop on ESC key
-            # close all open windows
-            cv2.destroyAllWindows()
-            break
+    show_epipolar_lines_points(img1, img2, T_c1_w, T_c2_w, F_23, points1, points2)
 
     # PART 2.4
     print("PART 2.4")
