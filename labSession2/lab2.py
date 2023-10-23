@@ -131,7 +131,7 @@ def plotPoint(point, label):
 
 
 # Triangulate a set of points given the projection matrices of two cameras.
-def triangulation(P1, P2, points1, points2, worldPoints):    
+def triangulation(P1, P2, points1, points2):    
     points3D = np.zeros((4, points1.shape[1]))
     for i in range(points1.shape[1]):
         p1 = points1[:, i].reshape(2, 1)
@@ -279,17 +279,37 @@ def compute_essential_matrix(F, K):
     E = K.T @ F @ K
     return E
 
+def points_in_front_of_both_cameras(x1, x2, T, K):
+    I = np.array([[1, 0 , 0, 0], [0, 1, 0, 0], [0, 0, 1 ,0]])
+
+    P1 = K @ I
+    P2 = K @ T
+
+    points3d = triangulation(P1, P2, x1, x2)
+    points3d = points3d.T
+    print(points3d.shape)
+
+    in_front = 0
+
+    for point in points3d:
+        if point[2] < 0:
+            continue
+
+        # z > 0 in C1 frame
+        pointFrame = T @ point.reshape(-1,1)
+        if pointFrame[2] > 0:
+            in_front += 1
+    
+    return in_front
+
+
 # Decompose the Essential matrix
-def decompose_essential_matrix(E):
-    print("E ", E)
+def decompose_essential_matrix(x1, x2, E, K):
     # Compute the SVD of the essential matrix
     U, _, V = np.linalg.svd(E)
+    t = U[:,2].reshape(-1,1)
     
     # Ensure that the determinant of U and Vt is positive (to ensure proper rotation)
-    if np.linalg.det(U) < 0:
-        U *= -1
-    if np.linalg.det(V) < 0:
-        V *= -1
 
     W = np.array([
         [0, -1, 0],
@@ -297,15 +317,21 @@ def decompose_essential_matrix(E):
         [0, 0, 1]
     ])
 
+    R_90 = U @ W @ V if np.linalg.det(U @ W @ V) > 0 else -U @ W.T @ V
+    R_n90 = U @ W.T @ V if np.linalg.det(U @ W.T @ V) > 0 else -U @ W.T @ V
+
     # Compute the four possible solutions
     solutions = []
-    solutions.append(np.hstack((U @ (W @ V),U[:,2].reshape(-1,1)))) #R + 90 + t
-    solutions.append(np.hstack((U @ (W @ V),-U[:,2].reshape(-1,1)))) # R + 90 - t
-    solutions.append(np.hstack((U @ (W.T @ V),U[:,2].reshape(-1,1))))  # R - 90 + t
-    solutions.append(np.hstack((U @ (W.T @ V),-U[:,2].reshape(-1,1)))) # R - 90 - t
+    solutions.append(np.hstack((R_90,U[:,2].reshape(-1,1)))) #R + 90 + t
+    solutions.append(np.hstack((R_90,-U[:,2].reshape(-1,1)))) # R + 90 - t
+    solutions.append(np.hstack((R_n90,U[:,2].reshape(-1,1))))  # R - 90 + t
+    solutions.append(np.hstack((R_90,-U[:,2].reshape(-1,1)))) # R - 90 - t
+    
 
-    return solutions
+    points_front = [ points_in_front_of_both_cameras(x1, x2, T, K) for T in solutions]
 
+    T = solutions[np.argmax(points_front)]
+    return T
 
 def computeHomography(points1, points2):
     A = np.zeros((points1.shape[1] * 2, 9))
@@ -351,7 +377,25 @@ if __name__ == '__main__':
 
     #PART 1
     
-    triangulation(P1, P2, points1, points2, worldPoints)
+    triangulation(P1, P2, points1, points2)
+
+    #Now we wnat to see the matching point in each image
+    img1 = cv2.cvtColor(cv2.imread('image1.png'), cv2.COLOR_BGR2RGB)
+    img2 = cv2.cvtColor(cv2.imread('image2.png'), cv2.COLOR_BGR2RGB)
+
+    plt.figure(figsize =(17,7))
+    plt.subplot(1,2,1)
+    plt.imshow(img1, cmap='gray', vmin=0, vmax=255)
+    plt.plot(points1[0, :], points1[1, :],'rx', markersize=10)
+    plotNumberedImagePoints(points1, 'r', (10,0)) # For plotting with numbers (choose one of the both options)
+    plt.title('Image 1')
+
+    plt.subplot(1, 2, 2)
+    plt.imshow(img2, cmap='gray', vmin=0, vmax=255)
+    plt.plot(points2[0, :], points2[1, :],'rx', markersize=10)
+    plotNumberedImagePoints(points2, 'r', (10,0)) # For plotting with numbers (choose one of the both options)
+    plt.title('Image 2')
+    plt.draw()
 
     #PART 2
 
@@ -361,100 +405,43 @@ if __name__ == '__main__':
     img1 = cv2.cvtColor(cv2.imread("image1.png"), cv2.COLOR_BGR2RGB)
     img2 = cv2.cvtColor(cv2.imread("image2.png"), cv2.COLOR_BGR2RGB)
 
-    # show_epipolar_lines(img1, img2, T_c1_w, T_c2_w, F_21)
+    show_epipolar_lines(img1, img2, T_c1_w, T_c2_w, F_21)
     
     # PART 2.2
     print("PART 2.2")
     F_22 = compute_fundamental_matrix_from_poses(T_c1_w, T_c2_w)
 
-    # show_epipolar_lines(img1, img2, T_c1_w, T_c2_w, F_22)
+    show_epipolar_lines(img1, img2, T_c1_w, T_c2_w, F_22)
 
 
     # PART 2.3
     print("PART 2.3")
     F_23 = compute_fundamental_matrix(points1, points2)
 
-    # show_epipolar_lines(img1, img2, T_c1_w, T_c2_w, F_23)
+    show_epipolar_lines(img1, img2, T_c1_w, T_c2_w, F_23)
 
     # PART 2.4
     print("PART 2.4")
 
     E_24 = compute_essential_matrix(F_21, K_c)
-    solutions_24 = decompose_essential_matrix(E_24)
-
-    P1_a = K_c @ idem
-    P2_a = K_c @ solutions_24[0]
-    P1_b = K_c @ idem
-    P2_b = K_c @ solutions_24[1]
-    P1_c = K_c @ idem
-    P2_c = K_c @ solutions_24[2]
-    P1_d = K_c @ idem
-    P2_d = K_c @ solutions_24[3]
-
-    # From the matches between image one and two triangulate the 3D points and uses them to discriminate the correct solution
-    points3D_a = triangulation(P1_a, P2_a, points1, points2, worldPoints)
-    points3D_b = triangulation(P1_b, P2_b, points1, points2, worldPoints)
-    points3D_c = triangulation(P1_c, P2_c, points1, points2, worldPoints)
-    points3D_d = triangulation(P1_d, P2_d, points1, points2, worldPoints)
-
-    # Select the solution with more points in front of the two cameras
-    points3D_a = points3D_a[:3] / points3D_a[3]  # Dehomogenize
-    points3D_b = points3D_b[:3] / points3D_b[3]  # Dehomogenize
-    points3D_c = points3D_c[:3] / points3D_c[3]  # Dehomogenize
-    points3D_d = points3D_d[:3] / points3D_d[3]  # Dehomogenize
-
-    # Count points with positive depth (in front of the cameras)
-    num_positive_depth_a = 0
-    num_positive_depth_b = 0
-    num_positive_depth_c = 0
-    num_positive_depth_d = 0
-
-    for i in range(points3D_a.shape[1]):
-        if points3D_a[2,i] > 0:
-            num_positive_depth_a += 1
-        if points3D_b[2,i] > 0:
-            num_positive_depth_b += 1
-        if points3D_c[2,i] > 0:
-            num_positive_depth_c += 1
-        if points3D_d[2,i] > 0:
-            num_positive_depth_d += 1
-
-
-    # Update the best solution if it has more points with positive depth
-    if num_positive_depth_a > num_positive_depth_b and num_positive_depth_a > num_positive_depth_c and num_positive_depth_a > num_positive_depth_d:
-        print("Solution a")
-        P1 = P1_a
-        P2 = P2_a
-        points3D = points3D_a
-    elif num_positive_depth_b > num_positive_depth_c and num_positive_depth_b > num_positive_depth_d:
-        print("Solution b")
-        P1 = P1_b
-        P2 = P2_b
-        points3D = points3D_b
-    elif num_positive_depth_c > num_positive_depth_d:
-        print("Solution c")
-        P1 = P1_c
-        P2 = P2_c
-        points3D = points3D_c
-    else:
-        print("Solution d")
-        P1 = P1_d
-        P2 = P2_d
-        points3D = points3D_d
-
+    solutions_24 = decompose_essential_matrix(points1, points2, E_24, K_c)
+    # add last row to make it 4x4
+    solutions_24 = np.vstack((solutions_24, np.array([0, 0, 0, 1])))
+    print(solutions_24)
+ 
     # PART 2.5
     
     # Visualize the cameras and the 3D points
     T_w_c1_24 = np.linalg.inv(K_c) @ P1
     T_w_c2_24 = np.linalg.inv(K_c) @ P2
 
-    print("own")
-    print(T_w_c1_24)
-    print(T_w_c2_24)
+    # print("own")
+    # print(T_w_c1_24)
+    # print(T_w_c2_24)
 
-    print("gt")
-    print(T_w_c1)
-    print(T_w_c2)
+    # print("gt")
+    # print(T_w_c1)
+    # print(T_w_c2)
     
     ##Plot the 3D cameras and the 3D points
     # set up a figure twice as wide as it is tall
@@ -473,7 +460,7 @@ if __name__ == '__main__':
     drawRefSystem(ax, T_w_c1, '-', 'C1')
     drawRefSystem(ax, T_w_c2, '-', 'C2')
     # drawRefSystem(ax, T_w_c1_24, '-', 'C1 estimated')
-    drawRefSystem(ax, solutions_24[1], '-', 'C2 estimated')
+    drawRefSystem(ax, T_w_c1 @ np.linalg.inv(solutions_24), '-', 'C2 estimated')
 
     ax.scatter(worldPoints[0, :], worldPoints[1, :], worldPoints[2, :], marker='.')
     # plotNumbered3DPoints(ax, worldPoints, 'r', (0.1, 0.1, 0.1)) # For plotting with numbers (choose one of the both options)
@@ -541,3 +528,11 @@ if __name__ == '__main__':
     print(point/point[2])
 
     print(H)
+
+    # Propose and use a metric for evaluating the accuracy of your results.
+    # Compute the error
+    error = 0
+    for i in range(matches1.shape[1]):
+        # mean square error
+        error += math.sqrt(np.linalg.norm(matches2[:,i] - H @ matches1[:,i])**2)
+    print(error)
