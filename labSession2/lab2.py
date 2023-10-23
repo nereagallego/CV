@@ -128,23 +128,21 @@ def plotPoint(point, label):
                  xytext=(0,5), # distance from text to points (x,y)
                  ha='center')
     
-"""
-    Triangulate a set of points given the projection matrices of two cameras.
-"""
-def triangulation(P1, P2, points1, points2, worldPoints):
-    point = 0
-    while point < points1.shape[1]:
-        p1 = points1[:, point]
-        p2 = points2[:, point]
-        pw = worldPoints[:, point]
-        # Triangulate the points
+
+
+# Triangulate a set of points given the projection matrices of two cameras.
+def triangulation(P1, P2, points1, points2, worldPoints):    
+    points3D = np.zeros((4, points1.shape[1]))
+    for i in range(points1.shape[1]):
+        p1 = points1[:, i].reshape(2, 1)
+        p2 = points2[:, i].reshape(2, 1)
         A = [p1[0] * P1[2, :] - P1[0, :], p1[1] * P1[2, :] - P1[1, :], p2[0] * P2[2, :] - P2[0, :], p2[1] * P2[2, :] - P2[1, :]]
         _, _, V = np.linalg.svd(A)
         X = V[-1, :]
-        X = X / X[-1]
-        if abs(X[0] - pw[0]) > 0.2 or abs(X[1] - pw[1]) > 0.2 or abs(X[2] - pw[2]) > 0.2:
-            print("Error in triangulation")
-        point += 1
+        points3D[:, i] = X / X[3]
+
+    return points3D
+
 
 # Compute the fundamental matrix from ground truth poses
     """_summary_ neew to check this
@@ -183,7 +181,7 @@ def compute_fundamental_matrix(points1, points2):
 
     return F/F[2,2]
 
-def show_epipolar_lines_manual(img1, img2, T_c1_w, T_c2_w, F):
+def show_epipolar_lines(img1, img2, T_c1_w, T_c2_w, F):
     
     # Compute the epipole
     epipole = compute_epipole(F)
@@ -201,16 +199,16 @@ def show_epipolar_lines_manual(img1, img2, T_c1_w, T_c2_w, F):
     while i < 8:
         # Wait for the user to click on the figure
         clicked_point = fig1.ginput(n=1, timeout=0)
-        print(clicked_point)
+        # print(clicked_point)
         ax1.scatter(clicked_point[0][0], clicked_point[0][1], c='r', s=40)
         fig1.canvas.draw()
 
         # Compute the epipolar line
         x1 = np.array([clicked_point[0][0], clicked_point[0][1]])
-        line = compute_epipolar_line(x1, F)
-        y = int(-line[2]/line[0])
-        x = int(-line[2]/line[1])
-        ax2.plot([0, x], [y, 0], c='b', linewidth=1)
+        line = compute_epipolar_line(x1, F) 
+        y = int(-line[2]/line[1])
+        x = int(-line[2]/line[0])
+        ax2.plot([x, 0], [0, y], c='b', linewidth=1)
         fig2.canvas.draw()
 
         i += 1
@@ -230,51 +228,6 @@ def show_epipolar_lines_manual(img1, img2, T_c1_w, T_c2_w, F):
     
     print('Press ESC to close the figures...')
     plt.show(block=True)
-
-
-def show_epipolar_lines_points(img1, img2, T_c1_w, T_c2_w, F, points1, points2):
-    print("TODO")
-    # # Compute the epipole
-    # epipole = compute_epipole(F)
-
-    # fig1, ax1 = plt.subplots()
-    # fig2, ax2 = plt.subplots()
-
-    # ax1.imshow(img1)
-    # ax2.imshow(img2)
-
-    # plt.show(block=False) 
-
-    # for i in range(points1.shape[1]):
-
-    #     ax1.scatter(points1, points2, c='r', s=10)
-    #     fig1.canvas.draw()
-
-    #     # Compute the epipolar line
-    #     x1 = np.array([clicked_point[0][0], clicked_point[0][1]])
-    #     line = compute_epipolar_line(x1, F)
-    #     y = int(-line[2]/line[0])
-    #     x = int(-line[2]/line[1])
-    #     ax2.plot([0, x], [y, 0], c='b', linewidth=1)
-    #     fig2.canvas.draw()
-
-    #     i += 1
-
-    # #Draw the epipole
-    # ax2.scatter(epipole[0], epipole[1], c='g', s=40)
-    # fig2.canvas.draw()
-    
-    # # Add key press event handler to close figures on ESC key press
-    # def on_key_press(event):
-    #     if event.key == 'escape':
-    #         plt.close(fig1)
-    #         plt.close(fig2)
-
-    # fig1.canvas.mpl_connect('key_press_event', on_key_press)
-    # fig2.canvas.mpl_connect('key_press_event', on_key_press)
-    
-    # print('Press ESC to close the figures...')
-    # plt.show(block=True)
 
 
 def compute_epipolar_line(x1, F):
@@ -324,23 +277,48 @@ def drawLine(l,strFormat,lWidth, label=""):
 # Compute the Essential matrix from Fundamental matrix
 def compute_essential_matrix(F, K):
     E = K.T @ F @ K
-    return E/E[2,2]
+    return E
 
 # Decompose the Essential matrix
 def decompose_essential_matrix(E):
+    print("E ", E)
     # Compute the SVD of the essential matrix
     U, _, V = np.linalg.svd(E)
+    # Ensure that the determinant of U and Vt is positive (to ensure proper rotation)
+    if np.linalg.det(U) < 0:
+        U *= -1
+    if np.linalg.det(V) < 0:
+        V *= -1
+
     W = np.array([[0, -1, 0], [1, 0, 0], [0, 0, 1]])
 
     # Compute the four possible solutions
     solutions = []
-    solutions.append((U @ W @ V, U[:, 2], V[:, 2]))
-    solutions.append((U @ W @ V, -U[:, 2], V[:, 2]))
-    solutions.append((U @ W.T @ V, U[:, 2], -V[:, 2]))
-    solutions.append((U @ W.T @ V, -U[:, 2], -V[:, 2]))
+    solutions.append(np.hstack((U @ (W @ V),U[:,2].reshape(-1,1)))) #R + 90 + t
+    solutions.append(np.hstack((U @ (W @ V),-U[:,2].reshape(-1,1)))) # R + 90 - t
+    solutions.append(np.hstack((U @ (W.T @ V),U[:,2].reshape(-1,1))))  # R - 90 + t
+    solutions.append(np.hstack((U @ (W.T @ V),-U[:,2].reshape(-1,1)))) # R - 90 - t
 
     return solutions
 
+
+def computeHomography(points1, points2):
+    A = np.zeros((points1.shape[1] * 2, 9))
+    for i in range(points1.shape[1]):
+        A[2*i, :] = [points1[0,i], points1[1,i], 1, 0, 0, 0, -points2[0,i]*points1[0,i], -points2[0,i]*points1[1,i], -points2[0,i]]
+        A[2*i+1,:] = [0, 0, 0, points1[0,i], points1[1,i], 1, -points2[1,i]*points1[0,i], -points2[1,i]*points1[1,i], -points2[1,i]]
+    
+    _, _, V = np.linalg.svd(A)
+    H = V[-1, :].reshape(3, 3)
+    return H/H[2,2]
+
+def generate_random_points_on_plane(plane_coefficients, num_points, x_range=(-10, 10), y_range=(-10, 10)):
+    a, b, c, d = plane_coefficients
+    x_values = np.random.uniform(low=x_range[0], high=x_range[1], size=num_points)
+    y_values = np.random.uniform(low=y_range[0], high=y_range[1], size=num_points)
+    z_values = -(a * x_values + b * y_values + d) / c
+    random_points = np.column_stack((x_values, y_values, z_values))
+    return random_points
    
 if __name__ == '__main__':
     np.set_printoptions(precision=4,linewidth=1024,suppress=True)
@@ -372,39 +350,192 @@ if __name__ == '__main__':
 
     #PART 2
 
-    print("PART 2.2")
+    print("PART 2.1")
     F_21 = np.loadtxt('F_21_test.txt')
 
     img1 = cv2.cvtColor(cv2.imread("image1.png"), cv2.COLOR_BGR2RGB)
     img2 = cv2.cvtColor(cv2.imread("image2.png"), cv2.COLOR_BGR2RGB)
 
-    show_epipolar_lines_manual(img1, img2, T_c1_w, T_c2_w, F_21)
+    # show_epipolar_lines(img1, img2, T_c1_w, T_c2_w, F_21)
     
     # PART 2.2
     print("PART 2.2")
     F_22 = compute_fundamental_matrix_from_poses(T_c1_w, T_c2_w)
 
-    img1 = cv2.cvtColor(cv2.imread("image1.png"), cv2.COLOR_BGR2RGB)
-    img2 = cv2.cvtColor(cv2.imread("image2.png"), cv2.COLOR_BGR2RGB)
+    # show_epipolar_lines(img1, img2, T_c1_w, T_c2_w, F_22)
 
-    show_epipolar_lines_manual(img1, img2, T_c1_w, T_c2_w, F_22)
-
-    
 
     # PART 2.3
     print("PART 2.3")
     F_23 = compute_fundamental_matrix(points1, points2)
 
-    img1 = cv2.cvtColor(cv2.imread("image1.png"), cv2.COLOR_BGR2RGB)
-    img2 = cv2.cvtColor(cv2.imread("image2.png"), cv2.COLOR_BGR2RGB)
-
-    show_epipolar_lines_points(img1, img2, T_c1_w, T_c2_w, F_23, points1, points2)
+    # show_epipolar_lines(img1, img2, T_c1_w, T_c2_w, F_23)
 
     # PART 2.4
     print("PART 2.4")
 
-    E_21 = compute_essential_matrix(F_21, K_c)
+    E_24 = compute_essential_matrix(F_21, K_c)
+    solutions_24 = decompose_essential_matrix(E_24)
+
+    P1_a = K_c @ idem
+    P2_a = K_c @ solutions_24[0]
+    P1_b = K_c @ idem
+    P2_b = K_c @ solutions_24[1]
+    P1_c = K_c @ idem
+    P2_c = K_c @ solutions_24[2]
+    P1_d = K_c @ idem
+    P2_d = K_c @ solutions_24[3]
+
+    # From the matches between image one and two triangulate the 3D points and uses them to discriminate the correct solution
+    points3D_a = triangulation(P1_a, P2_a, points1, points2, worldPoints)
+    points3D_b = triangulation(P1_b, P2_b, points1, points2, worldPoints)
+    points3D_c = triangulation(P1_c, P2_c, points1, points2, worldPoints)
+    points3D_d = triangulation(P1_d, P2_d, points1, points2, worldPoints)
+
+    # Select the solution with more points in front of the two cameras
+    points3D_a = points3D_a[:3] / points3D_a[3]  # Dehomogenize
+    points3D_b = points3D_b[:3] / points3D_b[3]  # Dehomogenize
+    points3D_c = points3D_c[:3] / points3D_c[3]  # Dehomogenize
+    points3D_d = points3D_d[:3] / points3D_d[3]  # Dehomogenize
+
+    # Count points with positive depth (in front of the cameras)
+    num_positive_depth_a = 0
+    num_positive_depth_b = 0
+    num_positive_depth_c = 0
+    num_positive_depth_d = 0
+
+    for i in range(points3D_a.shape[1]):
+        if points3D_a[2,i] > 0:
+            num_positive_depth_a += 1
+        if points3D_b[2,i] > 0:
+            num_positive_depth_b += 1
+        if points3D_c[2,i] > 0:
+            num_positive_depth_c += 1
+        if points3D_d[2,i] > 0:
+            num_positive_depth_d += 1
+
+
+    # Update the best solution if it has more points with positive depth
+    if num_positive_depth_a > num_positive_depth_b and num_positive_depth_a > num_positive_depth_c and num_positive_depth_a > num_positive_depth_d:
+        print("Solution a")
+        P1 = P1_a
+        P2 = P2_a
+        points3D = points3D_a
+    elif num_positive_depth_b > num_positive_depth_c and num_positive_depth_b > num_positive_depth_d:
+        print("Solution b")
+        P1 = P1_b
+        P2 = P2_b
+        points3D = points3D_b
+    elif num_positive_depth_c > num_positive_depth_d:
+        print("Solution c")
+        P1 = P1_c
+        P2 = P2_c
+        points3D = points3D_c
+    else:
+        print("Solution d")
+        P1 = P1_d
+        P2 = P2_d
+        points3D = points3D_d
+
+    # PART 2.5
     
+    # Visualize the cameras and the 3D points
+    T_w_c1_24 = np.linalg.inv(K_c) @ P1
+    T_w_c2_24 = np.linalg.inv(K_c) @ P2
+
+    print("own")
+    print(T_w_c1_24)
+    print(T_w_c2_24)
+
+    print("gt")
+    print(T_w_c1)
+    print(T_w_c2)
     
+    ##Plot the 3D cameras and the 3D points
+    # set up a figure twice as wide as it is tall
+    fig = plt.figure(figsize=plt.figaspect(0.5))
+
+    # =============
+    # First subplot
+    # =============
+    # set up the axes for the first plot
+    ax = fig.add_subplot(1, 1, 1, projection='3d', adjustable='box')
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+
+    drawRefSystem(ax, np.eye(4, 4), '-', 'W')
+    drawRefSystem(ax, T_w_c1, '-', 'C1')
+    drawRefSystem(ax, T_w_c2, '-', 'C2')
+    # drawRefSystem(ax, T_w_c1_24, '-', 'C1 estimated')
+    drawRefSystem(ax, solutions_24[1], '-', 'C2 estimated')
+
+    ax.scatter(worldPoints[0, :], worldPoints[1, :], worldPoints[2, :], marker='.')
+    # plotNumbered3DPoints(ax, worldPoints, 'r', (0.1, 0.1, 0.1)) # For plotting with numbers (choose one of the both options)
+
+    #Matplotlib does not correctly manage the axis('equal')
+    xFakeBoundingBox = np.linspace(0, 4, 2)
+    yFakeBoundingBox = np.linspace(0, 4, 2)
+    zFakeBoundingBox = np.linspace(0, 4, 2)
+    ax.plot(xFakeBoundingBox, yFakeBoundingBox, zFakeBoundingBox, 'w.')
     
+    plt.show()
+
+
+    # PART 3.1
+    print("PART 3.1")
+    # From the provided poses and the plane equation coefficients on camera reference 1, compute the homography that relates both images through the floor plane
+    Pi_1 = np.array([[0.0149, 0.9483, 0.3171, -1.7257]])
+
+    T_c2_c1 = np.dot(T_c2_w, np.linalg.inv(T_c1_w))
+    R_c2_c1 = T_c2_c1[0:3, 0:3]
+    t_c2_c1 = T_c2_c1[0:3, 3:4]
+
+    # Compute the homography
+    H = K_c @ (R_c2_c1 - t_c2_c1 @ Pi_1[:,0:3] / Pi_1[0,3])@ np.linalg.inv(K_c)
+    H = H/H[2,2]
+   
+
+    point = H @ np.array([414,375,1]).T
+
+    print(point/point[2])
+
+
+    print(H)
+
+
+    # PART 3.2
+    print("PART 3.2")
+
+    matches1 = np.loadtxt('x1FloorData.txt')
+    matches2 = np.loadtxt('x2FloorData.txt')
+    matches1 = matches1/matches1[2,:]
+
+    matches1_new = H@matches1
+    matches1_new /= matches1_new[2,:]
+
+    plt.figure(figsize =(17,7))
+    plt.subplot(1,2,1)
+    plt.imshow(img1, cmap='gray', vmin=0, vmax=255)
+    plt.plot(matches1[0, :], matches1[1, :],'rx', markersize=10)
+    #plotNumberedImagePoints(x1, 'r', (10,0)) # For plotting with numbers (choose one of the both options)
+    plt.title('Image 1')
+
+    plt.subplot(1, 2, 2)
+    plt.imshow(img2, cmap='gray', vmin=0, vmax=255)
+    plt.plot(matches1_new[0, :], matches1_new[1,:],'rx', markersize=10)
+    #plotNumberedImagePoints(x2, 'r', (10,0)) # For plotting with numbers (choose one of the both options)
+    plt.title('Image 2')
+    plt.draw()
     
+    # PART 3.3
+    print("PART 3.3")
+    # From a set of matches of points lying on the floor estimate the homography matrix relating both images.
+
+    # Compute the homography
+    H = computeHomography(matches1, matches2)
+
+    point = H @ np.array([414,375,1]).T
+    print(point/point[2])
+
+    print(H)
