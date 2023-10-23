@@ -284,13 +284,18 @@ def decompose_essential_matrix(E):
     print("E ", E)
     # Compute the SVD of the essential matrix
     U, _, V = np.linalg.svd(E)
+    
     # Ensure that the determinant of U and Vt is positive (to ensure proper rotation)
     if np.linalg.det(U) < 0:
         U *= -1
     if np.linalg.det(V) < 0:
         V *= -1
 
-    W = np.array([[0, -1, 0], [1, 0, 0], [0, 0, 1]])
+    W = np.array([
+        [0, -1, 0],
+        [1, 0, 0],
+        [0, 0, 1]
+    ])
 
     # Compute the four possible solutions
     solutions = []
@@ -516,21 +521,18 @@ if __name__ == '__main__':
 
     plt.figure(figsize =(17,7))
     plt.subplot(1,2,1)
-    plt.imshow(img1, cmap='gray', vmin=0, vmax=255)
+    plt.imshow(img1)
     plt.plot(matches1[0, :], matches1[1, :],'rx', markersize=10)
-    #plotNumberedImagePoints(x1, 'r', (10,0)) # For plotting with numbers (choose one of the both options)
     plt.title('Image 1')
 
     plt.subplot(1, 2, 2)
-    plt.imshow(img2, cmap='gray', vmin=0, vmax=255)
+    plt.imshow(img2)
     plt.plot(matches1_new[0, :], matches1_new[1,:],'rx', markersize=10)
-    #plotNumberedImagePoints(x2, 'r', (10,0)) # For plotting with numbers (choose one of the both options)
     plt.title('Image 2')
-    plt.draw()
+    plt.show()
     
     # PART 3.3
     print("PART 3.3")
-    # From a set of matches of points lying on the floor estimate the homography matrix relating both images.
 
     # Compute the homography
     H = computeHomography(matches1, matches2)
