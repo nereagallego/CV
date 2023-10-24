@@ -1,18 +1,5 @@
-#####################################################################################
-#
-# MRGCV Unizar - Computer vision - Laboratory 2
-#
-# Title: SIFT matching
-#
-# Date: 28 September 2020
-#
-#####################################################################################
-#
-# Authors: Jesus Bermudez, Richard Elvira, Jose Lamarca, JMM Montiel
-#
-# Version: 1.0
-#
-#####################################################################################
+# Computer Vision Laboratory 3
+# Authors: César Borja and Nerea Gallego
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -65,7 +52,32 @@ def matchWith2NDRR(desc1, desc2, distRatio, minDist):
             matches.append([kDesc1, indexSort[0], dist[indexSort[0]]])
     return matches
 
+def matchWith2NDRR_2(desc1, desc2, distRatio, minDist):
+    """
+    Nearest Neighbours Matching algorithm checking the Distance Ratio.
+    A match is accepted only if its distance is less than distRatio times
+    the distance to the second match.
+    -input:
+        desc1: descriptors from image 1 nDesc x 128
+        desc2: descriptors from image 2 nDesc x 128
+        distRatio:
+    -output:
+       matches: nMatches x 3 --> [[indexDesc1,indexDesc2,descriptorDistance],...]]
+    """
+    matches = []
+    nDesc1 = desc1.shape[0]
+    for kDesc1 in range(nDesc1):
+        dist = np.sqrt(np.sum((desc2 - desc1[kDesc1, :]) ** 2, axis=1))
+        indexSort = np.argsort(dist)
+        # Find the second closest match
+        if (dist[indexSort[1]]*distRatio < dist[indexSort[0]]):
+            matches.append([kDesc1, indexSort[0], dist[indexSort[0]]])
+    return matches
+
+
 if __name__ == '__main__':
+    
+    # PART 1
     np.set_printoptions(precision=4, linewidth=1024, suppress=True)
 
     # Images path
@@ -90,7 +102,7 @@ if __name__ == '__main__':
     matchesList = matchWith2NDRR(descriptors_1, descriptors_2, distRatio, minDist)
     dMatchesList = indexMatrixToMatchesList(matchesList)
     dMatchesList = sorted(dMatchesList, key=lambda x: x.distance)
-
+    
     # Plot the first 10 matches
     imgMatched = cv2.drawMatches(image_pers_1, keypoints_sift_1, image_pers_2, keypoints_sift_2, dMatchesList[:100],
                                  None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS and cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
@@ -109,3 +121,40 @@ if __name__ == '__main__':
     x1 = np.vstack((srcPts.T, np.ones((1, srcPts.shape[0]))))
     x2 = np.vstack((dstPts.T, np.ones((1, dstPts.shape[0]))))
 
+    """ It is quite difficult to reduce the number of false positive matches because some features 
+        found in the image one are not included in the image two. So, all the mathes given by SIFT
+        on those features are false positives.
+    """
+
+    # PART 2
+    # Feature extraction
+    sift = cv2.SIFT_create(nfeatures=0, nOctaveLayers = 5, contrastThreshold = 0.02, edgeThreshold = 20, sigma = 0.5)
+    keypoints_sift_1, descriptors_1 = sift.detectAndCompute(image_pers_1, None)
+    keypoints_sift_2, descriptors_2 = sift.detectAndCompute(image_pers_2, None)
+
+    # Select a threshold to have a low false positive rate
+    distRatio = 0.99
+    minDist = 500
+    matchesList = matchWith2NDRR_2(descriptors_1, descriptors_2, distRatio, minDist)
+    dMatchesList = indexMatrixToMatchesList(matchesList)
+    dMatchesList = sorted(dMatchesList, key=lambda x: x.distance)
+    
+    # Plot the first 10 matches
+    imgMatched = cv2.drawMatches(image_pers_1, keypoints_sift_1, image_pers_2, keypoints_sift_2, dMatchesList[:100],
+                                 None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS and cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+    plt.imshow(imgMatched, cmap='gray', vmin=0, vmax=255)
+    plt.draw()
+    plt.waitforbuttonpress()
+
+    # Conversion from DMatches to Python list
+    matchesList = matchesListToIndexMatrix(dMatchesList)
+
+    # Matched points in numpy from list of DMatches
+    srcPts = np.float32([keypoints_sift_1[m.queryIdx].pt for m in dMatchesList]).reshape(len(dMatchesList), 2)
+    dstPts = np.float32([keypoints_sift_2[m.trainIdx].pt for m in dMatchesList]).reshape(len(dMatchesList), 2)
+
+    # Matched points in homogeneous coordinates
+    x1 = np.vstack((srcPts.T, np.ones((1, srcPts.shape[0]))))
+    x2 = np.vstack((dstPts.T, np.ones((1, dstPts.shape[0]))))
+
+    # PART 3
