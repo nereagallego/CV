@@ -1,3 +1,6 @@
+# Computer Vision Laboratory 2
+# Authors: César Borja and Nerea Gallego
+
 import matplotlib.pyplot as plt
 import numpy as np
 import cv2
@@ -434,23 +437,10 @@ if __name__ == '__main__':
     # Visualize the cameras and the 3D points
     T_w_c1_24 = np.linalg.inv(K_c) @ P1
     T_w_c2_24 = np.linalg.inv(K_c) @ P2
-
-    # print("own")
-    # print(T_w_c1_24)
-    # print(T_w_c2_24)
-
-    # print("gt")
-    # print(T_w_c1)
-    # print(T_w_c2)
     
     ##Plot the 3D cameras and the 3D points
     # set up a figure twice as wide as it is tall
     fig = plt.figure(figsize=plt.figaspect(0.5))
-
-    # =============
-    # First subplot
-    # =============
-    # set up the axes for the first plot
     ax = fig.add_subplot(1, 1, 1, projection='3d', adjustable='box')
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
@@ -534,5 +524,5 @@ if __name__ == '__main__':
     error = 0
     for i in range(matches1.shape[1]):
         # mean square error
-        error += math.sqrt(np.linalg.norm(matches2[:,i] - H @ matches1[:,i])**2)
+        error += math.sqrt(np.linalg.norm(matches1[:,i] - matches1_new[:,i]))
     print(error)
