@@ -82,7 +82,17 @@ def SIFT_keypoints(gray, nfeatures : int, contrastThreshold=0.04, sigma=1.6):
 
     return kp, desc
 
-def calculate_RANSAC_own(gray, gray2):
+def computeHomography(points1, points2):
+    A = np.zeros((points1.shape[1] * 2, 9))
+    for i in range(points1.shape[1]):
+        A[2*i, :] = [points1[i,0], points1[i,1], 1, 0, 0, 0, -points2[i,0]*points1[i,0], -points2[i,0]*points1[i,1], -points2[i,0]]
+        A[2*i+1,:] = [0, 0, 0, points1[i,0], points1[i,0], 1, -points2[i,1]*points1[i,0], -points2[i,1]*points1[i,1], -points2[i,1]]
+    
+    _, _, V = np.linalg.svd(A)
+    H = V[-1, :].reshape(3, 3)
+    return H/H[2,2]
+
+def calculate_RANSAC_own_H(gray, gray2):
     kp1, desc1 = SIFT_keypoints(gray,1000)
     kp2, desc2  = SIFT_keypoints(gray2,1000)
     distRatio = 0.99
@@ -101,21 +111,19 @@ def calculate_RANSAC_own(gray, gray2):
         matches = matches1[:num_samples]
 
 
-        src_pts = np.float32([ kp1[m[0]].pt for m in matches ]).reshape(-1,1,2)
-        dst_pts = np.float32([ kp2[m[1]].pt for m in matches ]).reshape(-1,1,2)
-        H, mask = cv2.findHomography(src_pts, dst_pts, 0,5.0)
+        src_pts = np.float32([ kp1[m[0]].pt for m in matches ])
+        dst_pts = np.float32([ kp2[m[1]].pt for m in matches ])
+        H = computeHomography(src_pts,dst_pts)
         if H is not None:
             
-        
-            matchesMask = mask.ravel().tolist()
-    
             rest_matches = matches1[num_samples:]
             model = 0
             if H is not None:
                 for m in rest_matches:
-                    pts = np.float32( kp1[m[0]].pt ).reshape(-1,1,2)
-                    dst2 = cv2.perspectiveTransform(pts,H)
-                    dst = dst2[0][0]
+                    pts = np.float32( kp1[m[0]].pt )
+                    pts = np.append(pts,0)
+                    dst = H @ pts
+
                     x,y = kp2[m[1]].pt
                     
                     err = math.sqrt((dst[0] - x) ** 2 + (dst[1] - y) ** 2)
@@ -123,8 +131,82 @@ def calculate_RANSAC_own(gray, gray2):
                        model += 1 
                 if model >= 20:
                     best_model = H
-                    finished = True
+                    finished = True           
+    
+    return best_model, añadir
+
+def compute_epipolar_line(x1, F):
+    # Convert clicked point to homogeneous coordinates
+    x1 = np.append(x1, 1)
+
+    # Compute the epipolar line
+    l = np.dot(F, x1)
+
+    # Normalize the line
+    l = l / np.linalg.norm(l)
+
+    return l
+
+def compute_fundamental_matrix(points1, points2):
+    """_summary_ neew to check this"""
+    # Compute the fundamental matrix
+    A = np.zeros((points1.shape[1], 9))
+    for i in range(points1.shape[1]):
+        A[i, :] = [points1[0, i] * points2[0, i], points2[0, i] * points1[1, i], points2[0, i], points1[0, i] * points2[1, i], points1[1, i] * points2[1, i], points2[1,i], points1[0,i], points1[1,i], 1]
+
+    # compute linear least squares solution
+    _, _, V = np.linalg.svd(A)
+    F = V[-1, :].reshape(3, 3)
+
+    return F/F[2,2]
+
+def calculate_RANSAC_own_F(gray, gray2):
+    kp1, desc1 = SIFT_keypoints(gray,1000)
+    kp2, desc2  = SIFT_keypoints(gray2,1000)
+    distRatio = 0.99
+    minDist = 500
+    matches1 = matchWith2NDRR(desc1, desc2, distRatio, minDist)
+
+    num_samples = 8
+    best_model = None
+    finished = False
+    añadir = True
+
+    
+    while not finished:
+
+        np.random.shuffle(matches1)
+        matches = matches1[:num_samples]
+
+
+        src_pts = np.float32([ kp1[m[0]].pt for m in matches ]).reshape(-1,1,2)
+        dst_pts = np.float32([ kp2[m[1]].pt for m in matches ]).reshape(-1,1,2)
+        # Compute the fundamental matrix from matches
+        F = compute_fundamental_matrix(src_pts,dst_pts)
+
+        if F is not None:
+
+            l = compute_epipolar_line(src_pts[0], F)
             
+            rest_matches = matches1[num_samples:]
+            model = 0
+            if H is not None:
+                for m in rest_matches:
+
+                    x1 = kp1[m[0]].pt
+                    x2 = kp2[m[0]].pt
+
+                    l_2 = F @ x1
+                    
+
+                    dist_x2_l2 = np.abs(np.dot(x2.T,np.dot(F , x1))/ np.sqrt((l_2[0]**2 + l_2[1]**2)))
+
+
+                    if dist_x2_l2 < 2:
+                        nVotes = nVotes + 1
+                if model >= 20:
+                    best_model = H
+                    finished = True           
     
     return best_model, añadir
 
@@ -222,5 +304,11 @@ if __name__ == '__main__':
 
     # PART 4
     print("PART 4")
-    H, good_model = calculate_RANSAC_own(image_pers_1, image_pers_2)
+    H, good_model = calculate_RANSAC_own_H(image_pers_1, image_pers_2)
     print(H, " ", good_model)
+
+    # PART 5
+    print("PART 5")
+    
+    F, good_model = compute_fundamental_matrix(image_pers_1, image_pers_2)
+    print(F, " ", good_model)
