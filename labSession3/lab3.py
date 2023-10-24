@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import cv2
 import random
+import math
 
 def indexMatrixToMatchesList(matchesList):
     """
@@ -74,10 +75,64 @@ def matchWith2NDRR_2(desc1, desc2, distRatio, minDist):
             matches.append([kDesc1, indexSort[0], dist[indexSort[0]]])
     return matches
 
+def SIFT_keypoints(gray, nfeatures : int, contrastThreshold=0.04, sigma=1.6):
+
+    sift = cv2.SIFT_create(nfeatures)
+    kp, desc = sift.detectAndCompute(gray,None)
+
+    return kp, desc
+
+def calculate_RANSAC_own(gray, gray2):
+    kp1, desc1 = SIFT_keypoints(gray,1000)
+    kp2, desc2  = SIFT_keypoints(gray2,1000)
+    distRatio = 0.99
+    minDist = 500
+    matches1 = matchWith2NDRR(desc1, desc2, distRatio, minDist)
+
+    num_samples = 4
+    best_model = None
+    finished = False
+    añadir = True
+
+    
+    while not finished:
+
+        np.random.shuffle(matches1)
+        matches = matches1[:num_samples]
+
+
+        src_pts = np.float32([ kp1[m[0]].pt for m in matches ]).reshape(-1,1,2)
+        dst_pts = np.float32([ kp2[m[1]].pt for m in matches ]).reshape(-1,1,2)
+        H, mask = cv2.findHomography(src_pts, dst_pts, 0,5.0)
+        if H is not None:
+            
+        
+            matchesMask = mask.ravel().tolist()
+    
+            rest_matches = matches1[num_samples:]
+            model = 0
+            if H is not None:
+                for m in rest_matches:
+                    pts = np.float32( kp1[m[0]].pt ).reshape(-1,1,2)
+                    dst2 = cv2.perspectiveTransform(pts,H)
+                    dst = dst2[0][0]
+                    x,y = kp2[m[1]].pt
+                    
+                    err = math.sqrt((dst[0] - x) ** 2 + (dst[1] - y) ** 2)
+                    if err < 2:
+                       model += 1 
+                if model >= 20:
+                    best_model = H
+                    finished = True
+            
+    
+    return best_model, añadir
+
 
 if __name__ == '__main__':
     
     # PART 1
+    print("PART 1")
     np.set_printoptions(precision=4, linewidth=1024, suppress=True)
 
     # Images path
@@ -127,6 +182,7 @@ if __name__ == '__main__':
     """
 
     # PART 2
+    print("PART 2")
     # Feature extraction
     sift = cv2.SIFT_create(nfeatures=0, nOctaveLayers = 5, contrastThreshold = 0.02, edgeThreshold = 20, sigma = 0.5)
     keypoints_sift_1, descriptors_1 = sift.detectAndCompute(image_pers_1, None)
@@ -158,3 +214,13 @@ if __name__ == '__main__':
     x2 = np.vstack((dstPts.T, np.ones((1, dstPts.shape[0]))))
 
     # PART 3
+
+    # path = './output/image1_image2_matches.npz'
+    # npz = np.load(path)
+    #npz.files
+    #npz['matches']
+
+    # PART 4
+    print("PART 4")
+    H, good_model = calculate_RANSAC_own(image_pers_1, image_pers_2)
+    print(H, " ", good_model)
