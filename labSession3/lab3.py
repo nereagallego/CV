@@ -154,6 +154,9 @@ def compute_fundamental_matrix(points1, points2):
     for i in range(points1.shape[1]):
         A[i, :] = [points1[0, i] * points2[0, i], points2[0, i] * points1[1, i], points2[0, i], points1[0, i] * points2[1, i], points1[1, i] * points2[1, i], points2[1,i], points1[0,i], points1[1,i], 1]
 
+    # enforce rank 2
+    
+
     # compute linear least squares solution
     _, _, V = np.linalg.svd(A)
     F = V[-1, :].reshape(3, 3)
@@ -246,6 +249,7 @@ if __name__ == '__main__':
     plt.imshow(imgMatched, cmap='gray', vmin=0, vmax=255)
     plt.draw()
     plt.waitforbuttonpress()
+    plt.close()
 
     # Conversion from DMatches to Python list
     matchesList = matchesListToIndexMatrix(dMatchesList)
@@ -283,6 +287,7 @@ if __name__ == '__main__':
     plt.imshow(imgMatched, cmap='gray', vmin=0, vmax=255)
     plt.draw()
     plt.waitforbuttonpress()
+    plt.close()
 
     # Conversion from DMatches to Python list
     matchesList = matchesListToIndexMatrix(dMatchesList)
