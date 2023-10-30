@@ -92,7 +92,7 @@ def computeHomography(points1, points2):
     H = V[-1, :].reshape(3, 3)
     return H/H[2,2]
 
-def calculate_RANSAC_own_H(gray, gray2):
+def calculate_RANSAC_own_H(gray, gray2, threshold=2):
     kp1, desc1 = SIFT_keypoints(gray,1000)
     kp2, desc2  = SIFT_keypoints(gray2,1000)
     distRatio = 0.99
@@ -101,12 +101,12 @@ def calculate_RANSAC_own_H(gray, gray2):
 
     num_samples = 4
     best_model = None
+    best_model_votes = 0
     finished = False
     añadir = True
-
-    
-    while not finished:
-
+    t = 0
+    attempts = 1000
+    while t < attempts: 
         np.random.shuffle(matches1)
         matches = matches1[:num_samples]
 
@@ -116,7 +116,7 @@ def calculate_RANSAC_own_H(gray, gray2):
         H = computeHomography(src_pts,dst_pts)
         if H is not None:
             
-            rest_matches = matches1[num_samples:]
+            rest_matches = matches1[:-num_samples]
             model = 0
             if H is not None:
                 for m in rest_matches:
@@ -124,15 +124,19 @@ def calculate_RANSAC_own_H(gray, gray2):
                     pts = np.append(pts,0)
                     dst = H @ pts
 
+                    pts[0] = pts[0] / pts[2]
+                    pts[1] = pts[1] / pts[2]
+
                     x,y = kp2[m[1]].pt
                     
                     err = math.sqrt((dst[0] - x) ** 2 + (dst[1] - y) ** 2)
-                    if err < 2:
+                    # print(err)
+                    if err < threshold:
                        model += 1 
-                if model >= 20:
+                if model >= best_model_votes:
                     best_model = H
-                    finished = True           
-    
+
+        t += 1          
     return best_model, añadir
 
 def compute_epipolar_line(x1, F):
@@ -313,7 +317,7 @@ if __name__ == '__main__':
 
     # PART 4
     print("PART 4")
-    H, good_model = calculate_RANSAC_own_H(image_pers_1, image_pers_2)
+    H, good_model = calculate_RANSAC_own_H(image_pers_1, image_pers_2,2)
     print(H, " ", good_model)
 
     # PART 5
