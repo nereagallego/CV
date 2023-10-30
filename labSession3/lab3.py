@@ -325,7 +325,7 @@ if __name__ == '__main__':
 
     # PART 4
     print("PART 4")
-    H = calculate_RANSAC_own_H(image_pers_1, image_pers_2,2)
+    H = calculate_RANSAC_own_H(image_pers_1, image_pers_2,10)
     print(H)
 
     # PART 5
