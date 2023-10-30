@@ -85,8 +85,8 @@ def SIFT_keypoints(gray, nfeatures : int, contrastThreshold=0.04, sigma=1.6):
 def computeHomography(points1, points2):
     A = np.zeros((points1.shape[1] * 2, 9))
     for i in range(points1.shape[1]):
-        A[2*i, :] = [points1[i,0], points1[i,1], 1, 0, 0, 0, -points2[i,0]*points1[i,0], -points2[i,0]*points1[i,1], -points2[i,0]]
-        A[2*i+1,:] = [0, 0, 0, points1[i,0], points1[i,0], 1, -points2[i,1]*points1[i,0], -points2[i,1]*points1[i,1], -points2[i,1]]
+        A[2*i, :] = [points1[i,0], points1[i,1], 1.0, 0.0, 0.0, 0.0, -points2[i,0]*points1[i,0], -points2[i,0]*points1[i,1], -points2[i,0]]
+        A[2*i+1,:] = [0.0, 0.0, 0.0, points1[i,0], points1[i,0], 1.0, -points2[i,1]*points1[i,0], -points2[i,1]*points1[i,1], -points2[i,1]]
     
     _, _, V = np.linalg.svd(A)
     H = V[-1, :].reshape(3, 3)
@@ -103,9 +103,10 @@ def calculate_RANSAC_own_H(gray, gray2, threshold=2):
     best_model = None
     best_model_votes = 0
     finished = False
-    añadir = True
+    anadir = True
     t = 0
     attempts = 1000
+
     while t < attempts: 
         np.random.shuffle(matches1)
         matches = matches1[:num_samples]
@@ -113,6 +114,8 @@ def calculate_RANSAC_own_H(gray, gray2, threshold=2):
 
         src_pts = np.float32([ kp1[m[0]].pt for m in matches ])
         dst_pts = np.float32([ kp2[m[1]].pt for m in matches ])
+        # x1 = np.vstack((src_pts.T,np.ones((1,src_pts.shape[0]))))
+        # x2 = np.vstack((dst_pts.T,np.ones((1,dst_pts.shape[0]))))
         H = computeHomography(src_pts,dst_pts)
         if H is not None:
             
@@ -120,24 +123,29 @@ def calculate_RANSAC_own_H(gray, gray2, threshold=2):
             model = 0
             if H is not None:
                 for m in rest_matches:
-                    pts = np.float32( kp1[m[0]].pt )
-                    pts = np.append(pts,0)
-                    dst = H @ pts
+                    src = np.float32( kp1[m[0]].pt )
+                    src = np.append(src,1)
+                    dst_pred = H @ src
+                    dst = np.float32(kp2[m[1]].pt)
+                    dst = np.append(dst,1)
 
-                    pts[0] = pts[0] / pts[2]
-                    pts[1] = pts[1] / pts[2]
+                    dst_pred[0] = dst_pred[0] / dst_pred[2]
+                    dst_pred[1] = dst_pred[1] / dst_pred[2]
 
                     x,y = kp2[m[1]].pt
                     
-                    err = math.sqrt((dst[0] - x) ** 2 + (dst[1] - y) ** 2)
+                    # err = math.sqrt((dst[0] - x) ** 2 + (dst[1] - y) ** 2)
+                    err = np.abs(np.linalg.norm(dst-dst_pred))
                     # print(err)
                     if err < threshold:
                        model += 1 
-                if model >= best_model_votes:
+                if model > best_model_votes:
                     best_model = H
+                    best_model_votes = model
+                    print(model)
 
         t += 1          
-    return best_model, añadir
+    return best_model
 
 def compute_epipolar_line(x1, F):
     # Convert clicked point to homogeneous coordinates
@@ -317,8 +325,8 @@ if __name__ == '__main__':
 
     # PART 4
     print("PART 4")
-    H, good_model = calculate_RANSAC_own_H(image_pers_1, image_pers_2,2)
-    print(H, " ", good_model)
+    H = calculate_RANSAC_own_H(image_pers_1, image_pers_2,2)
+    print(H)
 
     # PART 5
     # print("PART 5")
