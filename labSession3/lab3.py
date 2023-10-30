@@ -153,13 +153,17 @@ def compute_fundamental_matrix(points1, points2):
     A = np.zeros((points1.shape[1], 9))
     for i in range(points1.shape[1]):
         A[i, :] = [points1[0, i] * points2[0, i], points2[0, i] * points1[1, i], points2[0, i], points1[0, i] * points2[1, i], points1[1, i] * points2[1, i], points2[1,i], points1[0,i], points1[1,i], 1]
-
-    # enforce rank 2
-    
+           
 
     # compute linear least squares solution
     _, _, V = np.linalg.svd(A)
     F = V[-1, :].reshape(3, 3)
+
+    # enforce rank 2
+    U, S, V = np.linalg.svd(F)
+    S[2] = 0
+
+    F = np.dot(U, np.dot(np.diag(S),V))
 
     return F/F[2,2]
 
