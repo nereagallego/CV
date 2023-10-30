@@ -308,7 +308,7 @@ if __name__ == '__main__':
     print(H, " ", good_model)
 
     # PART 5
-    print("PART 5")
+    # print("PART 5")
     
-    F, good_model = compute_fundamental_matrix(image_pers_1, image_pers_2)
-    print(F, " ", good_model)
+    # F, good_model = compute_fundamental_matrix(image_pers_1, image_pers_2)
+    # print(F, " ", good_model)
