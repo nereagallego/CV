@@ -162,7 +162,7 @@ def calculate_RANSAC_own_H(source,dst,threshold):
 
 def compute_epipolar_line(x1, F):
     # Convert clicked point to homogeneous coordinates
-    x1 = np.append(x1, 1)
+    # x1 = np.append(x1, 1)
 
     # Compute the epipolar line
     l = np.dot(F, x1)
@@ -178,17 +178,16 @@ def compute_fundamental_matrix(points1, points2):
     A = np.zeros((points1.shape[1], 9))
     for i in range(points1.shape[1]):
         A[i, :] = [points1[0, i] * points2[0, i], points2[0, i] * points1[1, i], points2[0, i], points1[0, i] * points2[1, i], points1[1, i] * points2[1, i], points2[1,i], points1[0,i], points1[1,i], 1]
-           
-
-    # compute linear least squares solution
+    
     _, _, V = np.linalg.svd(A)
-    F = V[-1, :].reshape(3, 3)
 
-    # enforce rank 2
+    # compute the fundamental matrix from the right singular vector corresponding to the smallest singular value
+    F = V[-1, :].reshape((3, 3))
     U, S, V = np.linalg.svd(F)
-    S[2] = 0
 
-    F = np.dot(U, np.dot(np.diag(S),V))
+    # enforce rank 2 constraint
+    S[2] = 0
+    F = U @ np.diag(S) @ V
 
     return F/F[2,2]
 
@@ -241,6 +240,55 @@ def calculate_RANSAC_own_F(gray, gray2):
                     finished = True           
     
     return best_model, añadir
+
+def calculate_RANSAC_own_F(source,dst,threshold):
+    num_samples = 4
+    num_Attempts = 5000
+
+    matches = np.vstack((source,dst))
+    best_model_votes = 0
+    best_model_matches = None
+
+    for kAttempt in range(num_Attempts):
+        votes = 0
+
+        rng = np.random.default_rng()
+        indx_subset = rng.choice(matches.shape[1] - 1, size=num_samples, replace=False)
+        matches_subset = []
+        rest_matches = []
+
+        for i in range(matches.shape[1]):
+            if i in indx_subset:
+                matches_subset.append(matches[:, i])
+            else:
+                rest_matches.append(matches[:, i])
+
+        matches_subset = np.array(matches_subset).T
+        rest_matches = np.array(rest_matches).T
+
+        F = compute_fundamental_matrix(matches_subset[0:3,:],matches_subset[3:6,:])
+        if F is not None:
+
+            for i in range(rest_matches.shape[1]):
+
+                x1 = rest_matches[0:3, i]
+                x2 = rest_matches[3:6, i]
+
+                l_2 = F @ x1
+                    
+
+                dist_x2_l2 = np.abs(np.dot(x2.T,np.dot(F , x1))/ np.sqrt((l_2[0]**2 + l_2[1]**2)))
+
+                if dist_x2_l2 < threshold:
+                    votes = votes + 1
+
+            if votes > best_model_votes:
+                best_model_votes = votes
+                print(votes)
+                F_most_voted = F
+                best_model_matches = matches_subset
+
+    return F_most_voted, best_model_matches
 
 
 if __name__ == '__main__':
@@ -355,8 +403,22 @@ if __name__ == '__main__':
 
     plt.waitforbuttonpress()
 
+    plt.close()
+
     # PART 5
-    # print("PART 5")
+    print("PART 5")
     
-    # F, good_model = compute_fundamental_matrix(image_pers_1, image_pers_2)
-    # print(F, " ", good_model)
+    F, x = calculate_RANSAC_own_F(x1, x2, 10)
+    print(F)
+
+    fig2, ax2 = plt.subplots(1, 2, figsize=(10, 5))
+    plt.suptitle("Points to calculate F")
+    ax2[0].set_title('Image 1')
+    ax2[0].imshow(image_pers_1)
+    ax2[1].set_title('Image 2')
+    ax2[1].imshow(image_pers_2)
+
+   # TODO: print the epipolar lines when clicking on the images
+   
+
+    plt.close()
