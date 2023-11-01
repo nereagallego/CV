@@ -84,8 +84,8 @@ def SIFT_keypoints(gray, nfeatures : int, contrastThreshold=0.04, sigma=1.6):
 
 def computeHomography(points1, points2):
     # print(points1.shape)
-    A = np.zeros((points1.shape[0] * 2, 9))
-    for i in range(points1.shape[0]):
+    A = np.zeros((points1.shape[1] * 2, 9))
+    for i in range(points1.shape[1]):
         # A[2*i, :] = [points1[i,0], points1[i,1], 1.0, 0.0, 0.0, 0.0, -points2[i,0]*points1[i,0], -points2[i,0]*points1[i,1], -points2[i,0]]
         # A[2*i+1,:] = [0.0, 0.0, 0.0, points1[i,0], points1[i,0], 1.0, -points2[i,1]*points1[i,0], -points2[i,1]*points1[i,1], -points2[i,1]]
         # A[2*i, :] = [points1[0,i], points1[1,i], 1.0, 0.0, 0.0, 0.0, -points2[0,i]*points1[0,i], -points2[0,i]*points1[1,i], -points2[0,i]]
@@ -96,19 +96,6 @@ def computeHomography(points1, points2):
     
     _, _, V = np.linalg.svd(A)
     H = V[-1, :].reshape((3, 3))
-    return H/H[2,2]
-
-def find_Homography(ptsource,ptdst):
-
-    A = []
-    for i in range(ptsource.shape[0]):
-        A.append(np.array([ptsource[0, i], ptsource[1, i], 1.0, 0.0, 0.0, 0.0, -ptdst[0, i] * ptsource[0, i], -ptdst[0, i] * ptsource[1, i], -ptdst[0, i]]))
-        A.append(np.array([0.0, 0.0, 0.0, ptsource[0, i], ptsource[1, i], 1.0, -ptdst[1, i] * ptsource[1, i], -ptdst[1, i] * ptsource[0, i], -ptdst[1, i]]))
-
-    A = np.array(A)
-    U, S, V = np.linalg.svd(A, full_matrices=True)
-    H = V.T[:, -1].reshape((3, 3))
-
     return H/H[2,2]
 
 def calculate_RANSAC_own_H(source,dst,threshold):
@@ -147,6 +134,7 @@ def calculate_RANSAC_own_H(source,dst,threshold):
             pred = pred / pred[2]
 
 
+            # error the Euclidian distance L2 between the matched point and the transformed point from the other image
             dist = np.abs( np.linalg.norm(x2 - pred) )
 
             if dist < threshold:
@@ -162,7 +150,7 @@ def calculate_RANSAC_own_H(source,dst,threshold):
 
 def compute_epipolar_line(x1, F):
     # Convert clicked point to homogeneous coordinates
-    # x1 = np.append(x1, 1)
+    x1 = np.append(x1, 1)
 
     # Compute the epipolar line
     l = np.dot(F, x1)
@@ -172,12 +160,15 @@ def compute_epipolar_line(x1, F):
 
     return l
 
+
 def compute_fundamental_matrix(points1, points2):
     """_summary_ neew to check this"""
     # Compute the fundamental matrix
+    # print(points1.shape[0], " ", points1.shape[1])
     A = np.zeros((points1.shape[1], 9))
     for i in range(points1.shape[1]):
         A[i, :] = [points1[0, i] * points2[0, i], points2[0, i] * points1[1, i], points2[0, i], points1[0, i] * points2[1, i], points1[1, i] * points2[1, i], points2[1,i], points1[0,i], points1[1,i], 1]
+        # A[i, :] = [points1[i,0] * points2[i,0], points2[i,0] * points1[i,0], points2[i,0], points1[i,0] * points2[i, 1], points1[i, 1] * points2[i, 1], points2[i,1], points1[i,0], points1[i,1], 1]
     
     _, _, V = np.linalg.svd(A)
 
@@ -187,69 +178,24 @@ def compute_fundamental_matrix(points1, points2):
 
     # enforce rank 2 constraint
     S[2] = 0
-    F = U @ np.diag(S) @ V
+    F = np.dot(U, np.dot(np.diag(S), V))
 
     return F/F[2,2]
 
-def calculate_RANSAC_own_F(gray, gray2):
-    kp1, desc1 = SIFT_keypoints(gray,1000)
-    kp2, desc2  = SIFT_keypoints(gray2,1000)
-    distRatio = 0.99
-    minDist = 500
-    matches1 = matchWith2NDRR(desc1, desc2, distRatio, minDist)
-
-    num_samples = 8
-    best_model = None
-    finished = False
-    añadir = True
-
-    
-    while not finished:
-
-        np.random.shuffle(matches1)
-        matches = matches1[:num_samples]
-
-
-        src_pts = np.float32([ kp1[m[0]].pt for m in matches ]).reshape(-1,1,2)
-        dst_pts = np.float32([ kp2[m[1]].pt for m in matches ]).reshape(-1,1,2)
-        # Compute the fundamental matrix from matches
-        F = compute_fundamental_matrix(src_pts,dst_pts)
-
-        if F is not None:
-
-            l = compute_epipolar_line(src_pts[0], F)
-            
-            rest_matches = matches1[num_samples:]
-            model = 0
-            if H is not None:
-                for m in rest_matches:
-
-                    x1 = kp1[m[0]].pt
-                    x2 = kp2[m[0]].pt
-
-                    l_2 = F @ x1
-                    
-
-                    dist_x2_l2 = np.abs(np.dot(x2.T,np.dot(F , x1))/ np.sqrt((l_2[0]**2 + l_2[1]**2)))
-
-
-                    if dist_x2_l2 < 2:
-                        nVotes = nVotes + 1
-                if model >= 20:
-                    best_model = H
-                    finished = True           
-    
-    return best_model, añadir
-
 def calculate_RANSAC_own_F(source,dst,threshold):
-    num_samples = 4
-    num_Attempts = 5000
+    num_samples = 8
+    spFrac = 0.5  # spurious fraction
+    P = 0.999  # probability of selecting at least one sample without spurious
+
+    # number m of random samples
+    nAttempts = np.round(np.log(1 - P) / np.log(1 - np.power((1 - spFrac),num_samples)))
+    num_attempts = nAttempts.astype(int)
 
     matches = np.vstack((source,dst))
     best_model_votes = 0
     best_model_matches = None
 
-    for kAttempt in range(num_Attempts):
+    for kAttempt in range(num_attempts):
         votes = 0
 
         rng = np.random.default_rng()
@@ -266,9 +212,9 @@ def calculate_RANSAC_own_F(source,dst,threshold):
         matches_subset = np.array(matches_subset).T
         rest_matches = np.array(rest_matches).T
 
+        # F = find_fundamental_matrix(matches_subset[0:3,:],matches_subset[3:6,:], nx1, ny1, nx2, ny2)
         F = compute_fundamental_matrix(matches_subset[0:3,:],matches_subset[3:6,:])
         if F is not None:
-
             for i in range(rest_matches.shape[1]):
 
                 x1 = rest_matches[0:3, i]
@@ -276,7 +222,6 @@ def calculate_RANSAC_own_F(source,dst,threshold):
 
                 l_2 = F @ x1
                     
-
                 dist_x2_l2 = np.abs(np.dot(x2.T,np.dot(F , x1))/ np.sqrt((l_2[0]**2 + l_2[1]**2)))
 
                 if dist_x2_l2 < threshold:
@@ -289,6 +234,62 @@ def calculate_RANSAC_own_F(source,dst,threshold):
                 best_model_matches = matches_subset
 
     return F_most_voted, best_model_matches
+
+# Compute the epipole from the fundamental matrix
+def compute_epipole(F):
+    # Compute the epipole
+    _, _, V = np.linalg.svd(F)
+    e = V[-1, :]
+    e = e / e[-1]
+    return e
+
+def show_epipolar_lines(img1, img2, F):
+    
+    # Compute the epipole
+    epipole = compute_epipole(F)
+
+    fig1, ax1 = plt.subplots()
+    fig2, ax2 = plt.subplots()
+
+    ax1.imshow(img1)
+    ax2.imshow(img2)
+
+    plt.show(block=False) 
+
+    print('Click on the figure to select points...')
+    i = 0
+    while i < 8:
+        # Wait for the user to click on the figure
+        clicked_point = fig1.ginput(n=1, timeout=0)
+        # print(clicked_point)
+        ax1.scatter(clicked_point[0][0], clicked_point[0][1], c='r', s=40)
+        fig1.canvas.draw()
+
+        # Compute the epipolar line
+        x1 = np.array([clicked_point[0][0], clicked_point[0][1]])
+        line = compute_epipolar_line(x1, F) 
+        y = int(-line[2]/line[1])
+        x = int(-line[2]/line[0])
+        ax2.plot([x, 0], [0, y], c='b', linewidth=1)
+        fig2.canvas.draw()
+
+        i += 1
+
+    #Draw the epipole
+    ax2.scatter(epipole[0], epipole[1], c='g', s=40)
+    fig2.canvas.draw()
+    
+    # Add key press event handler to close figures on ESC key press
+    def on_key_press(event):
+        if event.key == 'escape':
+            plt.close(fig1)
+            plt.close(fig2)
+
+    fig1.canvas.mpl_connect('key_press_event', on_key_press)
+    fig2.canvas.mpl_connect('key_press_event', on_key_press)
+    
+    print('Press ESC to close the figures...')
+    plt.show(block=True)
 
 
 if __name__ == '__main__':
@@ -329,17 +330,6 @@ if __name__ == '__main__':
     plt.waitforbuttonpress()
     plt.close()
 
-    # Conversion from DMatches to Python list
-    matchesList = matchesListToIndexMatrix(dMatchesList)
-
-    # Matched points in numpy from list of DMatches
-    srcPts = np.float32([keypoints_sift_1[m.queryIdx].pt for m in dMatchesList]).reshape(len(dMatchesList), 2)
-    dstPts = np.float32([keypoints_sift_2[m.trainIdx].pt for m in dMatchesList]).reshape(len(dMatchesList), 2)
-
-    # Matched points in homogeneous coordinates
-    x1 = np.vstack((srcPts.T, np.ones((1, srcPts.shape[0]))))
-    x2 = np.vstack((dstPts.T, np.ones((1, dstPts.shape[0]))))
-
     """ It is quite difficult to reduce the number of false positive matches because some features 
         found in the image one are not included in the image two. So, all the mathes given by SIFT
         on those features are false positives.
@@ -372,53 +362,73 @@ if __name__ == '__main__':
 
     # PART 4
     print("PART 4")
-    # H, x = calculate_RANSAC_own_H(image_pers_1, image_pers_2,10)
-    H, x = calculate_RANSAC_own_H(x1, x2, 10)
-    print(H)
 
-    fig, ax = plt.subplots(1, 2, figsize=(10, 5))
-    plt.suptitle('Homography')
-    ax[0].imshow(image_pers_1)
-    ax[0].set_title('Image 1')
-    ax[1].imshow(image_pers_2)
-    ax[1].set_title('Image 2')
+     # Select a threshold to have a low false positive rate
+    distRatio = 0.99
+    minDist = 75
+    matchesList = matchWith2NDRR_2(descriptors_1, descriptors_2, distRatio, minDist)
+    dMatchesList = indexMatrixToMatchesList(matchesList)
+    dMatchesList = sorted(dMatchesList, key=lambda x: x.distance)
 
-    for i in range(4):
-        # plt.subplot(ax[0])
-        ax[0].plot(x[0, i], x[1, i], '+r')
-        ax[1].plot(x[3, i], x[4, i], '+r')
-        plt.draw()
-    plt.waitforbuttonpress()
+    # Conversion from DMatches to Python list
+    matchesList = matchesListToIndexMatrix(dMatchesList)
 
-    plt.suptitle('Click points in image 1 to transform to image 2')
-    for i in range(4):
-        coord_click = plt.ginput(1, show_clicks=False)
-        coor = np.array([coord_click[0][0], coord_click[0][1], 1.0])
-        ax[0].plot(coor[0], coor[1], color[i], markersize=10)
-        plt.draw()
-        coord_hom = H @ coor
-        coord_hom = coord_hom / coord_hom[2]
-        ax[1].plot(coord_hom[0], coord_hom[1], color[i], markersize=10)
-        plt.draw()
+    # Matched points in numpy from list of DMatches
+    srcPts = np.float32([keypoints_sift_1[m.queryIdx].pt for m in dMatchesList]).reshape(len(dMatchesList), 2)
+    dstPts = np.float32([keypoints_sift_2[m.trainIdx].pt for m in dMatchesList]).reshape(len(dMatchesList), 2)
 
-    plt.waitforbuttonpress()
+    # Matched points in homogeneous coordinates
+    x1 = np.vstack((srcPts.T, np.ones((1, srcPts.shape[0]))))
+    x2 = np.vstack((dstPts.T, np.ones((1, dstPts.shape[0]))))
 
-    plt.close()
+    # H, x = calculate_RANSAC_own_H(x1, x2, 5)
+    # print(H)
+
+    # fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+    # plt.suptitle('Homography')
+    # ax[0].imshow(image_pers_1)
+    # ax[0].set_title('Image 1')
+    # ax[1].imshow(image_pers_2)
+    # ax[1].set_title('Image 2')
+
+    # for i in range(4):
+    #     # plt.subplot(ax[0])
+    #     ax[0].plot(x[0, i], x[1, i], '+r')
+    #     ax[1].plot(x[3, i], x[4, i], '+r')
+    #     plt.draw()
+    # plt.waitforbuttonpress()
+
+    # plt.suptitle('Click points in image 1 to transform to image 2')
+    # for i in range(4):
+    #     coord_click = plt.ginput(1, show_clicks=False)
+    #     coor = np.array([coord_click[0][0], coord_click[0][1], 1.0])
+    #     ax[0].plot(coor[0], coor[1], color[i], markersize=10)
+    #     plt.draw()
+    #     coord_hom = H @ coor
+    #     coord_hom = coord_hom / coord_hom[2]
+    #     ax[1].plot(coord_hom[0], coord_hom[1], color[i], markersize=10)
+    #     plt.draw()
+
+    # plt.waitforbuttonpress()
+
+    # plt.close()
 
     # PART 5
     print("PART 5")
     
-    F, x = calculate_RANSAC_own_F(x1, x2, 10)
+    F, x = calculate_RANSAC_own_F(x1, x2, 2)
+    # F, x = calculate_RANSAC_own_F(x1, x2, 5)
     print(F)
 
-    fig2, ax2 = plt.subplots(1, 2, figsize=(10, 5))
-    plt.suptitle("Points to calculate F")
-    ax2[0].set_title('Image 1')
-    ax2[0].imshow(image_pers_1)
-    ax2[1].set_title('Image 2')
-    ax2[1].imshow(image_pers_2)
+    # fig2, ax2 = plt.subplots(1, 2, figsize=(10, 5))
+    # plt.suptitle("Points to calculate F")
+    # ax2[0].set_title('Image 1')
+    # ax2[0].imshow(image_pers_1)
+    # ax2[1].set_title('Image 2')
+    # ax2[1].imshow(image_pers_2)
 
-   # TODO: print the epipolar lines when clicking on the images
+    # print the epipolar lines when clicking on the images
+    show_epipolar_lines(image_pers_1, image_pers_2, F)
    
 
-    plt.close()
+    # plt.close()
