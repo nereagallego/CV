@@ -160,9 +160,33 @@ def compute_epipolar_line(x1, F):
 
     return l
 
+# def get_normalization_transform(point_set):
+#     point_set = np.array(point_set)
+#     x = point_set[:, 0]
+#     y = point_set[:, 1]
+    
+#     centroid_x = np.mean(x)
+#     centroid_y = np.mean(y)
+#     x_new = x - centroid_x
+#     y_new = y - centroid_y
+
+#     mean_distance = np.mean(np.sqrt(x_new**2 + y_new**2))
+#     scale = np.sqrt(2)/mean_distance
+    
+#     T = np.eye(3)
+#     T[0, 0] = scale
+#     T[0, 2] = -scale*centroid_x
+#     T[1, 1] = scale
+#     T[1, 2] = -scale*centroid_y
+    
+#     return T
 
 def compute_fundamental_matrix(points1, points2):
-    """_summary_ neew to check this"""
+    # Normalize the points
+    # T1 = get_normalization_transform(points1.T)
+    # T2 = get_normalization_transform(points2.T)
+    # points1 = np.dot(T1, points1)
+    # points2 = np.dot(T2, points2)
     # Compute the fundamental matrix
     # print(points1.shape[0], " ", points1.shape[1])
     A = np.zeros((points1.shape[1], 9))
