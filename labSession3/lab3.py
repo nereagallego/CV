@@ -160,33 +160,26 @@ def compute_epipolar_line(x1, F):
 
     return l
 
-# def get_normalization_transform(point_set):
-#     point_set = np.array(point_set)
-#     x = point_set[:, 0]
-#     y = point_set[:, 1]
-    
-#     centroid_x = np.mean(x)
-#     centroid_y = np.mean(y)
-#     x_new = x - centroid_x
-#     y_new = y - centroid_y
+def normalizationMatrix(nx,ny):
+    """
+    Estimation of fundamental matrix(F) by matched n matched points.
+    n >= 8 to assure the algorithm.
 
-#     mean_distance = np.mean(np.sqrt(x_new**2 + y_new**2))
-#     scale = np.sqrt(2)/mean_distance
-    
-#     T = np.eye(3)
-#     T[0, 0] = scale
-#     T[0, 2] = -scale*centroid_x
-#     T[1, 1] = scale
-#     T[1, 2] = -scale*centroid_y
-    
-#     return T
+    -input:
+        nx: number of columns of the matrix
+        ny: number of rows of the matrix
+    -output:
+        Nv: normalization matrix such that xN = Nv @ x
+    """
+    Nv = np.array([[1/nx, 0, -1/2], [0, 1/ny, -1/2], [0, 0, 1]])
+    return Nv
 
-def compute_fundamental_matrix(points1, points2):
+def compute_fundamental_matrix(points1, points2, nx1, ny1, nx2, ny2):
     # Normalize the points
-    # T1 = get_normalization_transform(points1.T)
-    # T2 = get_normalization_transform(points2.T)
-    # points1 = np.dot(T1, points1)
-    # points2 = np.dot(T2, points2)
+    N1 = normalizationMatrix(nx1, ny1)
+    N2 = normalizationMatrix(nx2, ny2)
+    points1 = N1 @ points1
+    points2 = N2 @ points2
     # Compute the fundamental matrix
     # print(points1.shape[0], " ", points1.shape[1])
     A = np.zeros((points1.shape[1], 9))
@@ -203,12 +196,12 @@ def compute_fundamental_matrix(points1, points2):
     # enforce rank 2 constraint
     S[2] = 0
     F = np.dot(U, np.dot(np.diag(S), V))
-
+    F = np.dot(N2.T, np.dot(F, N1))
     return F/F[2,2]
 
-def calculate_RANSAC_own_F(source,dst,threshold):
+def calculate_RANSAC_own_F(source,dst,threshold, nx1, ny1, nx2, ny2):
     num_samples = 8
-    spFrac = 0.5  # spurious fraction
+    spFrac = 0.4  # spurious fraction
     P = 0.999  # probability of selecting at least one sample without spurious
 
     # number m of random samples
@@ -237,8 +230,8 @@ def calculate_RANSAC_own_F(source,dst,threshold):
         matches_subset = np.array(matches_subset).T
         rest_matches = np.array(rest_matches).T
 
-        # F = find_fundamental_matrix(matches_subset[0:3,:],matches_subset[3:6,:], nx1, ny1, nx2, ny2)
-        F = compute_fundamental_matrix(matches_subset[0:3,:],matches_subset[3:6,:])
+        F = compute_fundamental_matrix(matches_subset[0:3,:],matches_subset[3:6,:], nx1, ny1, nx2, ny2)
+        # F = compute_fundamental_matrix(matches_subset[0:3,:],matches_subset[3:6,:])
         if F is not None:
             for i in range(rest_matches.shape[1]):
 
@@ -271,7 +264,7 @@ def compute_epipole(F):
 def show_epipolar_lines(img1, img2, F):
     
     # Compute the epipole
-    epipole = compute_epipole(F)
+    # epipole = compute_epipole(F)
 
     fig1, ax1 = plt.subplots()
     fig2, ax2 = plt.subplots()
@@ -301,8 +294,8 @@ def show_epipolar_lines(img1, img2, F):
         i += 1
 
     #Draw the epipole
-    ax2.scatter(epipole[0], epipole[1], c='g', s=40)
-    fig2.canvas.draw()
+    # ax2.scatter(epipole[0], epipole[1], c='g', s=40)
+    # fig2.canvas.draw()
     
     # Add key press event handler to close figures on ESC key press
     def on_key_press(event):
@@ -316,23 +309,9 @@ def show_epipolar_lines(img1, img2, F):
     print('Press ESC to close the figures...')
     plt.show(block=True)
 
-def normalizationMatrix(nx,ny):
-    """
-    Estimation of fundamental matrix(F) by matched n matched points.
-    n >= 8 to assure the algorithm.
-
-    -input:
-        nx: number of columns of the matrix
-        ny: number of rows of the matrix
-    -output:
-        Nv: normalization matrix such that xN = Nv @ x
-    """
-    Nv = np.array([[1/nx, 0, -1/2], [0, 1/ny, -1/2], [0, 0, 1]])
-    return Nv
-
-
 if __name__ == '__main__':
     color = ['+b', '+g', '+c', '+m', '+y', '+k', '+w', '+p' ]
+    color2 = ['b', 'g', 'c', 'm', 'y', 'k', 'w', 'p' ]
 
     # PART 1
     print("PART 1")
@@ -378,19 +357,19 @@ if __name__ == '__main__':
     print("PART 2")
     
     # # Select a threshold to have a low false positive rate
-    # distRatio = 0.99
-    # minDist = 500
-    # matchesList = matchWith2NDRR_2(descriptors_1, descriptors_2, distRatio, minDist)
-    # dMatchesList = indexMatrixToMatchesList(matchesList)
-    # dMatchesList = sorted(dMatchesList, key=lambda x: x.distance)
+    distRatio = 0.99
+    minDist = 500
+    matchesList = matchWith2NDRR_2(descriptors_1, descriptors_2, distRatio, minDist)
+    dMatchesList = indexMatrixToMatchesList(matchesList)
+    dMatchesList = sorted(dMatchesList, key=lambda x: x.distance)
     
-    # # Plot the first 10 matches
-    # imgMatched = cv2.drawMatches(image_pers_1, keypoints_sift_1, image_pers_2, keypoints_sift_2, dMatchesList[:100],
-    #                              None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS and cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
-    # plt.imshow(imgMatched, cmap='gray', vmin=0, vmax=255)
-    # plt.draw()
-    # plt.waitforbuttonpress()
-    # plt.close()
+    # Plot the first 10 matches
+    imgMatched = cv2.drawMatches(image_pers_1, keypoints_sift_1, image_pers_2, keypoints_sift_2, dMatchesList[:100],
+                                 None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS and cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+    plt.imshow(imgMatched, cmap='gray', vmin=0, vmax=255)
+    plt.draw()
+    plt.waitforbuttonpress()
+    plt.close()
 
     # PART 3
 
@@ -403,7 +382,7 @@ if __name__ == '__main__':
     print("PART 4")
 
      # Select a threshold to have a low false positive rate
-    distRatio = 0.99
+    distRatio = 0.8
     minDist = 75
     matchesList = matchWith2NDRR_2(descriptors_1, descriptors_2, distRatio, minDist)
     dMatchesList = indexMatrixToMatchesList(matchesList)
@@ -420,54 +399,65 @@ if __name__ == '__main__':
     x1 = np.vstack((srcPts.T, np.ones((1, srcPts.shape[0]))))
     x2 = np.vstack((dstPts.T, np.ones((1, dstPts.shape[0]))))
 
-    # H, x = calculate_RANSAC_own_H(x1, x2, 5)
-    # print(H)
+    H, x = calculate_RANSAC_own_H(x1, x2, 2)
+    print(H)
 
-    # fig, ax = plt.subplots(1, 2, figsize=(10, 5))
-    # plt.suptitle('Homography')
-    # ax[0].imshow(image_pers_1)
-    # ax[0].set_title('Image 1')
-    # ax[1].imshow(image_pers_2)
-    # ax[1].set_title('Image 2')
+    fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+    plt.suptitle('Homography')
+    ax[0].imshow(image_pers_1)
+    ax[0].set_title('Image 1')
+    ax[1].imshow(image_pers_2)
+    ax[1].set_title('Image 2')
 
-    # for i in range(4):
-    #     # plt.subplot(ax[0])
-    #     ax[0].plot(x[0, i], x[1, i], '+r')
-    #     ax[1].plot(x[3, i], x[4, i], '+r')
-    #     plt.draw()
-    # plt.waitforbuttonpress()
+    for i in range(4):
+        # plt.subplot(ax[0])
+        ax[0].plot(x[0, i], x[1, i], '+r')
+        ax[1].plot(x[3, i], x[4, i], '+r')
+        plt.draw()
+    plt.waitforbuttonpress()
 
-    # plt.suptitle('Click points in image 1 to transform to image 2')
-    # for i in range(4):
-    #     coord_click = plt.ginput(1, show_clicks=False)
-    #     coor = np.array([coord_click[0][0], coord_click[0][1], 1.0])
-    #     ax[0].plot(coor[0], coor[1], color[i], markersize=10)
-    #     plt.draw()
-    #     coord_hom = H @ coor
-    #     coord_hom = coord_hom / coord_hom[2]
-    #     ax[1].plot(coord_hom[0], coord_hom[1], color[i], markersize=10)
-    #     plt.draw()
+    plt.suptitle('Click points in image 1 to transform to image 2')
+    for i in range(4):
+        coord_click = plt.ginput(1, show_clicks=False)
+        coor = np.array([coord_click[0][0], coord_click[0][1], 1.0])
+        ax[0].plot(coor[0], coor[1], color[i], markersize=10)
+        plt.draw()
+        coord_hom = H @ coor
+        coord_hom = coord_hom / coord_hom[2]
+        ax[1].plot(coord_hom[0], coord_hom[1], color[i], markersize=10)
+        plt.draw()
 
-    # plt.waitforbuttonpress()
+    plt.waitforbuttonpress()
 
-    # plt.close()
+    plt.close()
 
     # PART 5
     print("PART 5")
     
-    F, x = calculate_RANSAC_own_F(x1, x2, 2)
-    # F, x = calculate_RANSAC_own_F(x1, x2, 5)
+    F, x = calculate_RANSAC_own_F(x1, x2, 2, image_pers_1.shape[1], image_pers_1.shape[0], image_pers_2.shape[1], image_pers_2.shape[0])
     print(F)
 
-    # fig2, ax2 = plt.subplots(1, 2, figsize=(10, 5))
-    # plt.suptitle("Points to calculate F")
-    # ax2[0].set_title('Image 1')
-    # ax2[0].imshow(image_pers_1)
-    # ax2[1].set_title('Image 2')
-    # ax2[1].imshow(image_pers_2)
-
     # print the epipolar lines when clicking on the images
-    show_epipolar_lines(image_pers_1, image_pers_2, F)
+    fig2, ax2 = plt.subplots(1, 2, figsize=(8, 4))
+    plt.suptitle("Points to calculate F")
+    ax2[0].set_title('Image 1')
+    ax2[0].imshow(image_pers_1)
+    ax2[1].set_title('Image 2')
+    ax2[1].imshow(image_pers_2)
+
+    for i in range(6):
+        coord_clicked_point = plt.ginput(1, show_clicks=False)
+        p_img_1 = np.array([coord_clicked_point[0][0], coord_clicked_point[0][1]])
+        ax2[0].plot(p_img_1[0], p_img_1[1], color[i], markersize=10)
+        fig2.canvas.draw()
+        line = compute_epipolar_line(p_img_1, F)
+
+        c1 = int(-line[2]/line[1])
+        c2 = int(-line[2]/line[0])
+        ax2[1].plot([c1, 0], [0, c2], color2[i], linewidth=2)
+        fig2.canvas.draw()
+
+    plt.waitforbuttonpress()
    
 
-    # plt.close()
+    plt.close()
