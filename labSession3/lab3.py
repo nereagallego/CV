@@ -214,6 +214,7 @@ def calculate_RANSAC_own_F(source,dst,threshold):
     # number m of random samples
     nAttempts = np.round(np.log(1 - P) / np.log(1 - np.power((1 - spFrac),num_samples)))
     num_attempts = nAttempts.astype(int)
+    num_attempts = 5000
 
     matches = np.vstack((source,dst))
     best_model_votes = 0
@@ -314,6 +315,20 @@ def show_epipolar_lines(img1, img2, F):
     
     print('Press ESC to close the figures...')
     plt.show(block=True)
+
+def normalizationMatrix(nx,ny):
+    """
+    Estimation of fundamental matrix(F) by matched n matched points.
+    n >= 8 to assure the algorithm.
+
+    -input:
+        nx: number of columns of the matrix
+        ny: number of rows of the matrix
+    -output:
+        Nv: normalization matrix such that xN = Nv @ x
+    """
+    Nv = np.array([[1/nx, 0, -1/2], [0, 1/ny, -1/2], [0, 0, 1]])
+    return Nv
 
 
 if __name__ == '__main__':
