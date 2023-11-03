@@ -201,13 +201,13 @@ def compute_fundamental_matrix(points1, points2, nx1, ny1, nx2, ny2):
 
 def calculate_RANSAC_own_F(source,dst,threshold, nx1, ny1, nx2, ny2):
     num_samples = 8
-    spFrac = 0.4  # spurious fraction
+    spFrac = 0.5  # spurious fraction
     P = 0.999  # probability of selecting at least one sample without spurious
 
     # number m of random samples
     nAttempts = np.round(np.log(1 - P) / np.log(1 - np.power((1 - spFrac),num_samples)))
     num_attempts = nAttempts.astype(int)
-    num_attempts = 5000
+    # num_attempts = 5000
 
     matches = np.vstack((source,dst))
     best_model_votes = 0
@@ -438,24 +438,25 @@ if __name__ == '__main__':
     print(F)
 
     # print the epipolar lines when clicking on the images
-    fig2, ax2 = plt.subplots(1, 2, figsize=(8, 4))
-    plt.suptitle("Points to calculate F")
-    ax2[0].set_title('Image 1')
-    ax2[0].imshow(image_pers_1)
-    ax2[1].set_title('Image 2')
-    ax2[1].imshow(image_pers_2)
+    show_epipolar_lines(image_pers_1, image_pers_2, F)
+    # fig2, ax2 = plt.subplots(1, 2, figsize=(8, 4))
+    # plt.suptitle("Points to calculate F")
+    # ax2[0].set_title('Image 1')
+    # ax2[0].imshow(image_pers_1)
+    # ax2[1].set_title('Image 2')
+    # ax2[1].imshow(image_pers_2)
 
-    for i in range(6):
-        coord_clicked_point = plt.ginput(1, show_clicks=False)
-        p_img_1 = np.array([coord_clicked_point[0][0], coord_clicked_point[0][1]])
-        ax2[0].plot(p_img_1[0], p_img_1[1], color[i], markersize=10)
-        fig2.canvas.draw()
-        line = compute_epipolar_line(p_img_1, F)
+    # for i in range(6):
+    #     coord_clicked_point = plt.ginput(1, show_clicks=False)
+    #     p_img_1 = np.array([coord_clicked_point[0][0], coord_clicked_point[0][1]])
+    #     ax2[0].plot(p_img_1[0], p_img_1[1], color[i], markersize=10)
+    #     fig2.canvas.draw()
+    #     line = compute_epipolar_line(p_img_1, F)
 
-        c1 = int(-line[2]/line[1])
-        c2 = int(-line[2]/line[0])
-        ax2[1].plot([c1, 0], [0, c2], color2[i], linewidth=2)
-        fig2.canvas.draw()
+    #     c1 = int(-line[2]/line[1])
+    #     c2 = int(-line[2]/line[0])
+    #     ax2[1].plot([c1, 0], [0, c2], color2[i], linewidth=2)
+    #     fig2.canvas.draw()
 
     plt.waitforbuttonpress()
    
