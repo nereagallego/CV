@@ -277,9 +277,12 @@ if __name__ == '__main__':
             matches, conf = pred['matches0'], pred['matching_scores0']
             timer.update('matcher')
 
+            dsc0 = pred['descriptors0']
+            dsc1 = pred['descriptors1']
             # Write the matches to disk.
             out_matches = {'keypoints0': kpts0, 'keypoints1': kpts1,
-                           'matches': matches, 'match_confidence': conf}
+                           'matches': matches, 'match_confidence': conf,
+                           'descriptors0': dsc0, 'descriptors1': dsc1 }
             np.savez(str(matches_path), **out_matches)
 
         # Keep the matching keypoints.

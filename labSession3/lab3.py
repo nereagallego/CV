@@ -207,7 +207,7 @@ def calculate_RANSAC_own_F(source,dst,threshold, nx1, ny1, nx2, ny2):
     # number m of random samples
     nAttempts = np.round(np.log(1 - P) / np.log(1 - np.power((1 - spFrac),num_samples)))
     num_attempts = nAttempts.astype(int)
-    # num_attempts = 5000
+    # num_attempts = 10000
 
     matches = np.vstack((source,dst))
     best_model_votes = 0
@@ -261,7 +261,7 @@ def compute_epipole(F):
     e = e / e[-1]
     return e
 
-def show_epipolar_lines(img1, img2, F):
+def show_epipolar_lines(img1, img2, F, title='Epipolar lines'):
     
     # Compute the epipole
     # epipole = compute_epipole(F)
@@ -271,6 +271,8 @@ def show_epipolar_lines(img1, img2, F):
 
     ax1.imshow(img1)
     ax2.imshow(img2)
+    ax1.set_title('Image 1: '+ title)
+    ax2.set_title('Image 2: '+ title)
 
     plt.show(block=False) 
 
@@ -293,7 +295,7 @@ def show_epipolar_lines(img1, img2, F):
 
         i += 1
 
-    #Draw the epipole
+    # #Draw the epipole
     # ax2.scatter(epipole[0], epipole[1], c='g', s=40)
     # fig2.canvas.draw()
     
@@ -373,16 +375,26 @@ if __name__ == '__main__':
 
     # PART 3
 
-    # path = './output/image1_image2_matches.npz'
-    # npz = np.load(path)
-    #npz.files
-    #npz['matches']
+    path = './output/image1_image2_matches.npz'
+    npz = np.load(path)
+    keypoints_SG_0 = npz['keypoints0']
+    keypoints_SG_1 = npz['keypoints1']
+    matchesListSG_0 = [i for i, x in enumerate(npz['matches']) if x != -1]
+    matchesListSG_1 = [x for i, x in enumerate(npz['matches']) if x != -1]
+
+    # Matched points from SuperGlue
+    srcPts_SG = np.float32([keypoints_SG_0[m] for m in matchesListSG_0])
+    dstPts_SG = np.float32([keypoints_SG_1[m] for m in matchesListSG_1])
+    
+    # Matched points in homogeneous coordinates
+    x1_SG = np.vstack((srcPts_SG.T, np.ones((1, srcPts_SG.shape[0]))))
+    x2_SG = np.vstack((dstPts_SG.T, np.ones((1, dstPts_SG.shape[0]))))
 
     # PART 4
     print("PART 4")
 
-     # Select a threshold to have a low false positive rate
-    distRatio = 0.8
+    # Select a threshold to have a low false positive rate
+    distRatio = 0.5
     minDist = 75
     matchesList = matchWith2NDRR_2(descriptors_1, descriptors_2, distRatio, minDist)
     dMatchesList = indexMatrixToMatchesList(matchesList)
@@ -399,11 +411,14 @@ if __name__ == '__main__':
     x1 = np.vstack((srcPts.T, np.ones((1, srcPts.shape[0]))))
     x2 = np.vstack((dstPts.T, np.ones((1, dstPts.shape[0]))))
 
+    # Compute the homography with SIFT and KNN matches
+    print('Computing the homography with SIFT and KNN matches...')
     H, x = calculate_RANSAC_own_H(x1, x2, 2)
     print(H)
 
+    # Plot the SIFT and KNN matches
     fig, ax = plt.subplots(1, 2, figsize=(10, 5))
-    plt.suptitle('Homography')
+    plt.suptitle('Homography with SIFT and KNN matches')
     ax[0].imshow(image_pers_1)
     ax[0].set_title('Image 1')
     ax[1].imshow(image_pers_2)
@@ -431,32 +446,58 @@ if __name__ == '__main__':
 
     plt.close()
 
+    # Compute the homography with SuperGlue matches
+    print('Computing the homography with SuperGlue matches...')
+    H_SG, x_SG = calculate_RANSAC_own_H(x1_SG, x2_SG, 2)
+    print(H_SG)
+
+    # Plot the SuperGlue matches
+    fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+    plt.suptitle('Homography with SuperGlue matches')
+    ax[0].imshow(image_pers_1)
+    ax[0].set_title('Image 1')
+    ax[1].imshow(image_pers_2)
+    ax[1].set_title('Image 2')
+
+    for i in range(4):
+        # plt.subplot(ax[0])
+        ax[0].plot(x_SG[0, i], x_SG[1, i], '+r')
+        ax[1].plot(x_SG[3, i], x_SG[4, i], '+r')
+        plt.draw()
+    plt.waitforbuttonpress()
+
+    plt.suptitle('Click points in image 1 to transform to image 2')
+    for i in range(4):
+        coord_click = plt.ginput(1, show_clicks=False)
+        coor = np.array([coord_click[0][0], coord_click[0][1], 1.0])
+        ax[0].plot(coor[0], coor[1], color[i], markersize=10)
+        plt.draw()
+        coord_hom = H_SG @ coor
+        coord_hom = coord_hom / coord_hom[2]
+        ax[1].plot(coord_hom[0], coord_hom[1], color[i], markersize=10)
+        plt.draw()
+
+    plt.waitforbuttonpress()
+
+    plt.close()
+
     # PART 5
     print("PART 5")
     
+    # Computing the fundamental matrix with SIFT and KNN matches
+    print('Computing the fundamental matrix with SIFT and KNN matches...')
     F, x = calculate_RANSAC_own_F(x1, x2, 2, image_pers_1.shape[1], image_pers_1.shape[0], image_pers_2.shape[1], image_pers_2.shape[0])
     print(F)
 
+    # Computing the fundamental matrix with SuperGlue matches
+    print('Computing the fundamental matrix with SuperGlue matches...')
+    F_SG, x_SG = calculate_RANSAC_own_F(x1_SG, x2_SG, 2, image_pers_1.shape[1], image_pers_1.shape[0], image_pers_2.shape[1], image_pers_2.shape[0])
+    print(F_SG)
+
     # print the epipolar lines when clicking on the images
-    show_epipolar_lines(image_pers_1, image_pers_2, F)
-    # fig2, ax2 = plt.subplots(1, 2, figsize=(8, 4))
-    # plt.suptitle("Points to calculate F")
-    # ax2[0].set_title('Image 1')
-    # ax2[0].imshow(image_pers_1)
-    # ax2[1].set_title('Image 2')
-    # ax2[1].imshow(image_pers_2)
+    show_epipolar_lines(image_pers_1, image_pers_2, F, 'SIFT and KNN matches')
 
-    # for i in range(6):
-    #     coord_clicked_point = plt.ginput(1, show_clicks=False)
-    #     p_img_1 = np.array([coord_clicked_point[0][0], coord_clicked_point[0][1]])
-    #     ax2[0].plot(p_img_1[0], p_img_1[1], color[i], markersize=10)
-    #     fig2.canvas.draw()
-    #     line = compute_epipolar_line(p_img_1, F)
-
-    #     c1 = int(-line[2]/line[1])
-    #     c2 = int(-line[2]/line[0])
-    #     ax2[1].plot([c1, 0], [0, c2], color2[i], linewidth=2)
-    #     fig2.canvas.draw()
+    show_epipolar_lines(image_pers_1, image_pers_2, F_SG, 'SuperGlue matches')
 
     plt.waitforbuttonpress()
    
