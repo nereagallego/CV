@@ -201,13 +201,13 @@ def compute_fundamental_matrix(points1, points2, nx1, ny1, nx2, ny2):
 
 def calculate_RANSAC_own_F(source,dst,threshold, nx1, ny1, nx2, ny2):
     num_samples = 8
-    spFrac = 0.5  # spurious fraction
+    spFrac = 0.6  # spurious fraction
     P = 0.999  # probability of selecting at least one sample without spurious
 
     # number m of random samples
     nAttempts = np.round(np.log(1 - P) / np.log(1 - np.power((1 - spFrac),num_samples)))
     num_attempts = nAttempts.astype(int)
-    # num_attempts = 10000
+    num_attempts = 10000
 
     matches = np.vstack((source,dst))
     best_model_votes = 0
@@ -411,14 +411,14 @@ if __name__ == '__main__':
     x1 = np.vstack((srcPts.T, np.ones((1, srcPts.shape[0]))))
     x2 = np.vstack((dstPts.T, np.ones((1, dstPts.shape[0]))))
 
-    # Compute the homography with SIFT and KNN matches
-    print('Computing the homography with SIFT and KNN matches...')
+    # Compute the homography with SIFT and 2NDRR matches
+    print('Computing the homography with SIFT and 2NDRR matches...')
     H, x = calculate_RANSAC_own_H(x1, x2, 2)
     print(H)
 
     # Plot the SIFT and KNN matches
     fig, ax = plt.subplots(1, 2, figsize=(10, 5))
-    plt.suptitle('Homography with SIFT and KNN matches')
+    plt.suptitle('Homography with SIFT and 2NDRR matches')
     ax[0].imshow(image_pers_1)
     ax[0].set_title('Image 1')
     ax[1].imshow(image_pers_2)
@@ -484,8 +484,8 @@ if __name__ == '__main__':
     # PART 5
     print("PART 5")
     
-    # Computing the fundamental matrix with SIFT and KNN matches
-    print('Computing the fundamental matrix with SIFT and KNN matches...')
+    # Computing the fundamental matrix with SIFT and 2NDRR matches
+    print('Computing the fundamental matrix with SIFT and 2NDRR matches...')
     F, x = calculate_RANSAC_own_F(x1, x2, 2, image_pers_1.shape[1], image_pers_1.shape[0], image_pers_2.shape[1], image_pers_2.shape[0])
     print(F)
 
@@ -495,7 +495,7 @@ if __name__ == '__main__':
     print(F_SG)
 
     # print the epipolar lines when clicking on the images
-    show_epipolar_lines(image_pers_1, image_pers_2, F, 'SIFT and KNN matches')
+    show_epipolar_lines(image_pers_1, image_pers_2, F, 'SIFT and 2NDRR matches')
 
     show_epipolar_lines(image_pers_1, image_pers_2, F_SG, 'SuperGlue matches')
 
