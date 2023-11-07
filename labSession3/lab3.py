@@ -486,8 +486,8 @@ if __name__ == '__main__':
     
     # Computing the fundamental matrix with SIFT and 2NDRR matches
     print('Computing the fundamental matrix with SIFT and 2NDRR matches...')
-    F, x = calculate_RANSAC_own_F(x1, x2, 2, image_pers_1.shape[1], image_pers_1.shape[0], image_pers_2.shape[1], image_pers_2.shape[0])
-    print(F)
+    # F, x = calculate_RANSAC_own_F(x1, x2, 2, image_pers_1.shape[1], image_pers_1.shape[0], image_pers_2.shape[1], image_pers_2.shape[0])
+    # print(F)
 
     # Computing the fundamental matrix with SuperGlue matches
     print('Computing the fundamental matrix with SuperGlue matches...')
@@ -495,7 +495,7 @@ if __name__ == '__main__':
     print(F_SG)
 
     # print the epipolar lines when clicking on the images
-    show_epipolar_lines(image_pers_1, image_pers_2, F, 'SIFT and 2NDRR matches')
+    # show_epipolar_lines(image_pers_1, image_pers_2, F, 'SIFT and 2NDRR matches')
 
     show_epipolar_lines(image_pers_1, image_pers_2, F_SG, 'SuperGlue matches')
 
