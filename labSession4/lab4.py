@@ -168,24 +168,37 @@ def resBundleProjection(Op, x1Data, x2Data, K_c, nPoints):
     theta_ext_2 =  K_c @ T #Proyection matrix
 
     # Compute the 3D points
-    res = []
-    for i in range(nPoints):
+    # res = []
+    # for i in range(nPoints):
 
-        X_3D = np.hstack((Op[5+i*3: 5+i*3+3], np.array([1.0])))
-        projection1 = theta_ext_1 @ X_3D
-        projection1 = projection1[0:2] / projection1[2]
-        x1 = x1Data[0:1, i]
-        res1 = x1 - projection1
+    #     X_3D = np.hstack((Op[5+i*3: 5+i*3+3], np.array([1.0])))
+    #     projection1 = theta_ext_1 @ X_3D
+    #     projection1 = projection1[0:2] / projection1[2]
+    #     x1 = x1Data[0:1, i]
+    #     res1 = x1 - projection1
 
-        projection2 = theta_ext_2 @ X_3D
-        projection2 = projection2[0:2] / projection2[2]
-        x2 = x2Data[0:1, i]
-        res2 = x2 - projection2
+    #     projection2 = theta_ext_2 @ X_3D
+    #     projection2 = projection2[0:2] / projection2[2]
+    #     x2 = x2Data[0:1, i]
+    #     res2 = x2 - projection2
 
-        res.append(res1[0])
-        res.append(res1[1])
-        res.append(res2[0])
-        res.append(res2[1])
+    #     res.append(res1[0])
+    #     res.append(res1[1])
+    #     res.append(res2[0])
+    #     res.append(res2[1])
+
+    X_3D = np.hstack((Op[5:].reshape(-1, 3), np.ones((nPoints, 1))))
+
+    projection1 = theta_ext_1 @ X_3D.T
+    projection1 = projection1[:2, :] / projection1[2, :]
+    res1 = x1Data[:, :nPoints].T - projection1.T
+
+    projection2 = theta_ext_2 @ X_3D.T
+    projection2 = projection2[:2, :] / projection2[2, :]
+    res2 = x2Data[:, :nPoints].T - projection2.T
+
+    res = np.hstack((res1, res2)).flatten()
+    # print(res)
 
     return np.array(res)
 
@@ -256,7 +269,8 @@ if __name__ == '__main__':
     # PART 2.1
    
     print("PART 2.1")
-    Op = [0.0, 0.0, 0.0, 0.0, 0.0] + worldPoints[0:3].flatten().tolist()
+    Op = [0.0, 0.0, 0.0, 0.0, 0.0] + worldPoints[0:3].T.flatten().tolist()
+    
     OpOptim = scOptim.least_squares(resBundleProjection, Op, args=(points1, points2, K_c, points1.shape[1]), method='lm')
 
 
