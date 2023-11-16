@@ -377,11 +377,12 @@ if __name__ == '__main__':
     plt.show()
 
     #### Plot residual bundel adj ##############
-
-    x1_p = P1 @ points_3D_Op.T
+    idem = np.append(np.eye(3), np.zeros((3, 1)), axis=1)
+    P1_est = K_c @ idem
+    x1_p = P1_est @ points_3D_Op.T
+    x1_p = x1_p / x1_p[2, :]
     x2_p = P2_op @ points_3D_Op.T
-    x1_p /= x1_p[2, :]
-    x2_p /= x2_p[2, :]
+    x2_p = x2_p / x2_p[2, :]
 
     plt.figure(4)
     plt.imshow(image_pers_1, cmap='gray', vmin=0, vmax=255)
@@ -442,12 +443,12 @@ if __name__ == '__main__':
     plt.show()
 
     # PART 4
-    print("PART 4")
+    # print("PART 4")
 
-    Op = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0] + worldPoints[0:3].T.flatten().tolist()
+    # Op = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0] + worldPoints[0:3].T.flatten().tolist()
 
-    X = np.vstack((np.vstack((points1, points2)), points3))
-    OpOptim = scOptim.least_squares(resBundleProjection_n_cameras, Op, args=(X, 3, K_c, points1.shape[1]), method='lm')
+    # X = np.vstack((np.vstack((points1, points2)), points3))
+    # OpOptim = scOptim.least_squares(resBundleProjection_n_cameras, Op, args=(X, 3, K_c, points1.shape[1]), method='lm')
 
 
 
