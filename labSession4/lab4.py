@@ -186,7 +186,7 @@ def resBundleProjection(Op, x1Data, x2Data, K_c, nPoints):
     """
 
     '''
-    Op[0:2] -> theta, phi
+    Op[0:1] -> theta, phi
     Op[2:5] -> Rx,Ry,Rz
     Op[5:5 + nPoints*3] -> 3DXx,3DXy,3DXz
     '''
@@ -234,10 +234,10 @@ def resBundleProjection_n_cameras(Op, xData, nCameras, K_c, nPoints):
     """
 
     '''
-    Op[0:2] -> theta, phi
+    Op[0:1] -> theta, phi
     Op[2:5] -> Rx,Ry,Rz
-    Op[8:11] -> theta, phi
-    Op[11:14] -> Rx,Ry,Rz
+    Op[6:7] -> theta, phi
+    Op[8:11] -> Rx,Ry,Rz
     ...
     Op[] -> 3DXx,3DXy,3DXz
     '''
@@ -253,19 +253,28 @@ def resBundleProjection_n_cameras(Op, xData, nCameras, K_c, nPoints):
     theta_ext.append(theta_ext_1)
     theta_ext.append(theta_ext_2)
     for i in range(nCameras - 2):
-        R = sc.linalg.expm(crossMatrix(Op[8+6*i:11+6*i]))
-        t = np.array([np.sin(Op[6*i])*np.cos(Op[7+6*i]), np.sin(Op[6*i])*np.sin(Op[7+6*i]), np.cos(Op[6*i])]).reshape(-1,1)
+        R = sc.linalg.expm(crossMatrix(Op[7+5*i:10+5*i]))
+        t = np.array([np.sin(Op[5+5*i])*np.cos(Op[6+5*i]), np.sin(Op[5+5*i])*np.sin(Op[6+5*i]), np.cos(Op[5+5*i])]).reshape(-1,1)
         T = np.hstack((R, t))
         theta_ext.append(K_c @ T)
 
     # Compute the residuals
-    res = np.array([])
-    for i in range(nCameras):
-        X_3D = np.hstack((Op[5+6*i:].reshape(-1, 3), np.ones((nPoints, 1))))
+   
+    Xpoints = X.reshape(nCameras, nPoints, 2)
 
-        projection = theta_ext[i] @ X_3D.T
-        projection = projection[:2, :] / projection[2, :]
-        res = np.hstack((res, xData[i][:, :nPoints].T - projection.T)).flatten()
+    X_3D = np.hstack((Op[11+(nCameras-2)*5:].reshape(-1, 3), np.ones((nPoints, 1))))
+    res = []
+    for i in range(nCameras):
+        for j in range(nPoints):
+
+            X_3D = np.hstack((Op[6*(nCameras-1)+j*3-1: 6*(nCameras-1)+j*3+2], np.array([1.0])))
+            projection = theta_ext[i] @ X_3D
+            projection = projection[0:2] / projection[2]
+            err = Xpoints[i][:,j] - projection
+
+            res.append(err[0])
+            res.append(err[1])
+    return np.array(res)
 
 if __name__ == '__main__':
     print("Hello world")
@@ -445,10 +454,10 @@ if __name__ == '__main__':
     # PART 4
     # print("PART 4")
 
-    # Op = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0] + worldPoints[0:3].T.flatten().tolist()
+    Op = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0] + worldPoints[0:3].T.flatten().tolist()
 
-    # X = np.vstack((np.vstack((points1, points2)), points3))
-    # OpOptim = scOptim.least_squares(resBundleProjection_n_cameras, Op, args=(X, 3, K_c, points1.shape[1]), method='lm')
+    X = np.vstack((np.vstack((points1, points2)), points3))
+    OpOptim = scOptim.least_squares(resBundleProjection_n_cameras, Op, args=(X, 3, K_c, points1.shape[1]), method='lm')
 
 
 
