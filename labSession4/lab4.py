@@ -243,41 +243,38 @@ def resBundleProjection_n_cameras(Op, xData, nCameras, K_c, nPoints):
     '''
     # Bundle adjustment using least squares function
     idem = np.append(np.eye(3), np.zeros((3, 1)), axis=1)
-    R = sc.linalg.expm(crossMatrix(Op[2:5]))
-    t = np.array([np.sin(Op[0])*np.cos(Op[1]), np.sin(Op[0])*np.sin(Op[1]), np.cos(Op[0])]).reshape(-1,1)
+    # R = sc.linalg.expm(crossMatrix(Op[2:5]))
+    # t = np.array([np.sin(Op[0])*np.cos(Op[1]), np.sin(Op[0])*np.sin(Op[1]), np.cos(Op[0])]).reshape(-1,1)
     theta_ext_1 = K_c @ idem
-    T = np.hstack((R, t))
-    theta_ext_2 =  K_c @ T #Proyection matrix
+    # T = np.hstack((R, t))
+    # theta_ext_2 =  K_c @ T #Proyection matrix
 
     theta_ext = []
     theta_ext.append(theta_ext_1)
-    theta_ext.append(theta_ext_2)
-    for i in range(nCameras - 2):
-        R = sc.linalg.expm(crossMatrix(Op[7+5*i:10+5*i]))
-        t = np.array([np.sin(Op[5+5*i])*np.cos(Op[6+5*i]), np.sin(Op[5+5*i])*np.sin(Op[6+5*i]), np.cos(Op[5+5*i])]).reshape(-1,1)
+    # theta_ext.append(theta_ext_2)
+    for i in range(nCameras - 1):
+        R = sc.linalg.expm(crossMatrix(Op[2+5*i:5+5*i]))
+        t = np.array([np.sin(Op[5*i])*np.cos(Op[1+5*i]), np.sin(Op[0+5*i])*np.sin(Op[1+5*i]), np.cos(Op[0+5*i])]).reshape(-1,1)
         T = np.hstack((R, t))
         theta_ext.append(K_c @ T)
 
     # Compute the residuals
    
-    Xpoints = X.reshape(nCameras, nPoints, 2)
+    Xpoints = xData
+    # Xpoints = xData.reshape(nCameras, nPoints, 2)
 
-    X_3D = np.hstack((Op[11+(nCameras-2)*5:].reshape(-1, 3), np.ones((nPoints, 1))))
+    X_3D = np.hstack((Op[(nCameras-1)*5:].reshape(-1, 3), np.ones((nPoints, 1))))
+    # print(X_3D)
     res = []
     for i in range(nCameras):
-        for j in range(nPoints):
+        projection = theta_ext[i] @ X_3D.T
+        projection = projection[:2, :] / projection[2, :]
+        res.append(Xpoints[i] - projection.T)
 
-            X_3D = np.hstack((Op[6*(nCameras-1)+j*3-1: 6*(nCameras-1)+j*3+2], np.array([1.0])))
-            projection = theta_ext[i] @ X_3D
-            projection = projection[0:2] / projection[2]
-            err = Xpoints[i][:,j] - projection
-
-            res.append(err[0])
-            res.append(err[1])
-    return np.array(res)
+    # print(res)
+    return np.array(res).flatten()
 
 if __name__ == '__main__':
-    print("Hello world")
 
     image_pers_1 = cv2.imread('image1.png')
     image_pers_2 = cv2.imread('image2.png')
@@ -312,7 +309,7 @@ if __name__ == '__main__':
     solutions_24 = decompose_essential_matrix(points1, points2, E_24, K_c)
     # add last row to make it 4x4
     solutions_24 = np.vstack((solutions_24, np.array([0, 0, 0, 1])))
-    print(solutions_24)
+    
 
     T_w_c1_24 = np.linalg.inv(K_c) @ P1
     T_w_c2_24 = np.linalg.inv(K_c) @ P2
@@ -396,13 +393,9 @@ if __name__ == '__main__':
     plt.figure(4)
     plt.imshow(image_pers_1, cmap='gray', vmin=0, vmax=255)
     plt.title('Residuals after Bundle adjustment Image1')
-    print(points1.shape)
-    print(x1_p.shape)
-    print(worldPoints.shape)
+    
     plotResidual(points1.T, x1_p.T, 'k-')
-    # plt.plot(points1[0, :], points1[1, :], 'bo')
-    # plt.plot(x1_p[0, :], x1_p[1, :], 'rx')
-    # plotNumberedImagePoints(x1[0:2, :], 'r', 4)
+ 
     plt.draw()
 
     plt.show()
@@ -411,9 +404,7 @@ if __name__ == '__main__':
     plt.imshow(image_pers_2, cmap='gray', vmin=0, vmax=255)
     plt.title('Residuals after Bundle adjustment Image2')
     plotResidual(points2.T, x2_p.T, 'k-')
-    # plt.plot(points2[0, :], points2[1, :], 'bo')
-    # plt.plot(x2_p[0, :], x2_p[1, :], 'rx')
-    # plotNumberedImagePoints(x2[0:2, :], 'r', 4)
+
     plt.draw()
 
     plt.show()
@@ -454,10 +445,63 @@ if __name__ == '__main__':
     # PART 4
     # print("PART 4")
 
-    Op = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0] + worldPoints[0:3].T.flatten().tolist()
+    # Op = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0] + worldPoints[0:3].T.flatten().tolist()
 
-    X = np.vstack((np.vstack((points1, points2)), points3))
-    OpOptim = scOptim.least_squares(resBundleProjection_n_cameras, Op, args=(X, 3, K_c, points1.shape[1]), method='lm')
+    # X = np.vstack((np.vstack((points1, points2)), points3))
+    # OpOptim = scOptim.least_squares(resBundleProjection_n_cameras, Op, args=(X, 3, K_c, points1.shape[1]), method='lm')
 
+    Op = [0.0, 0.0, 0.0, 0.0, 0.0] + worldPoints[0:3].T.flatten().tolist()
+
+    X = np.stack((points1.T, points2.T))
+    OpOptim = scOptim.least_squares(resBundleProjection_n_cameras, Op, args=(X, 2, K_c, points1.shape[1]), method='lm')
+
+    print(T_c2_c1_op)
+    R_c2_c1 = sc.linalg.expm(crossMatrix(OpOptim.x[2:5]))
+    t_c2_c1 = np.array([np.sin(OpOptim.x[0])*np.cos(OpOptim.x[1]), np.sin(OpOptim.x[0])*np.sin(OpOptim.x[1]), np.cos(OpOptim.x[0])]).reshape(-1,1)
+    T_c2_c1_op = np.hstack((R_c2_c1, t_c2_c1))
+    P2_op = K_c @ T_c2_c1_op
+    T_c2_c1_op = np.vstack((T_c2_c1_op, np.array([0, 0, 0, 1])))
+    print(T_c2_c1_op)
+
+    # R_c3_c1 = sc.linalg.expm(crossMatrix(OpOptim.x[7:10]))
+    # t_c3_c1 = np.array([np.sin(OpOptim.x[5])*np.cos(OpOptim.x[6]), np.sin(OpOptim.x[5])*np.sin(OpOptim.x[6]), np.cos(OpOptim.x[5])]).reshape(-1,1)
+    # T_c3_c1_op = np.hstack((R_c3_c1, t_c3_c1))
+    # P3_op = K_c @ T_c3_c1_op
+    # T_c3_c1_op = np.vstack((T_c3_c1_op, np.array([0, 0, 0, 1])))
+
+    # points_3D_Op = np.concatenate((OpOptim.x[10: 10+3], np.array([1.0])), axis=0)
+
+    # for i in range(worldPoints.shape[1]-1):
+    #     points_3D_Op = np.vstack((points_3D_Op, np.concatenate((OpOptim.x[13+3*i: 13+3*i+3], np.array([1.0])) ,axis=0)))
+
+    for i in range(worldPoints.shape[1]-1):
+        points_3D_Op = np.vstack((points_3D_Op, np.concatenate((OpOptim.x[8+3*i: 8+3*i+3], np.array([1.0])) ,axis=0)))
+
+
+    #### Draw 3D ################
+    fig3D = plt.figure(2)
+    ax = plt.axes(projection='3d', adjustable='box')
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+
+    drawRefSystem(ax, np.eye(4, 4), '-', 'W')
+    drawRefSystem(ax, T_w_c1, '-', 'C1')
+    #drawRefSystem(ax, wTc1 @ np.linalg.inv(c2Tc1_Op), '-', 'C2_BA')
+    drawRefSystem(ax, T_w_c1 @ np.linalg.inv(T_c2_c1_op), '-', 'C2_BA_scaled')
+    drawRefSystem(ax, T_w_c2, '-', 'C2_True')
+    # drawRefSystem(ax, T_w_c1 @ np.linalg.inv(T_c3_c1_op), '-', 'C3_BA_scaled')
+    drawRefSystem(ax, T_w_c3, '-', 'C3_True')
+
+    points_Op = T_w_c1 @ (points_3D_Op).T
+
+    # ax.scatter(points_Op[0, :], points_Op[1, :], points_Op[2, :], marker='.')
+    # plotNumbered3DPoints(ax, points_Op, 'b', 0.1)
+
+    ax.scatter(worldPoints[0, :], worldPoints[1, :], worldPoints[2, :], marker='.')
+    # plotNumbered3DPoints(ax, worldPoints, 'r', 0.1)
+
+    plt.title('3D points Bundle adjustment (red=True data)')
+    plt.show()
 
 
