@@ -457,7 +457,7 @@ if __name__ == '__main__':
 
     print(T_c2_c1_op)
     R_c2_c1_2 = sc.linalg.expm(crossMatrix(OpOptim2.x[2:5]))
-    t_c2_c1_2 = np.array([np.sin(OpOptim.x[0])*np.cos(OpOptim.x[1]), np.sin(OpOptim.x[0])*np.sin(OpOptim.x[1]), np.cos(OpOptim.x[0])]).reshape(-1,1)
+    t_c2_c1_2 = np.array([np.sin(OpOptim2.x[0])*np.cos(OpOptim2.x[1]), np.sin(OpOptim2.x[0])*np.sin(OpOptim2.x[1]), np.cos(OpOptim2.x[0])]).reshape(-1,1)
     T_c2_c1_op_2 = np.hstack((R_c2_c1_2, t_c2_c1_2))
     P2_op_2 = K_c @ T_c2_c1_op_2
     T_c2_c1_op_2 = np.vstack((T_c2_c1_op_2, np.array([0, 0, 0, 1])))
