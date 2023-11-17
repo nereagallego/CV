@@ -450,18 +450,18 @@ if __name__ == '__main__':
     # X = np.vstack((np.vstack((points1, points2)), points3))
     # OpOptim = scOptim.least_squares(resBundleProjection_n_cameras, Op, args=(X, 3, K_c, points1.shape[1]), method='lm')
 
-    Op = [0.0, 0.0, 0.0, 0.0, 0.0] + worldPoints[0:3].T.flatten().tolist()
+    Op2 = [0.0, 0.0, 0.0, 0.0, 0.0] + worldPoints[0:3].T.flatten().tolist()
 
-    X = np.stack((points1.T, points2.T))
-    OpOptim2 = scOptim.least_squares(resBundleProjection_n_cameras, Op, args=(X, 2, K_c, points1.shape[1]), method='lm')
+    X2 = np.stack((points1.T, points2.T))
+    OpOptim2 = scOptim.least_squares(resBundleProjection_n_cameras, Op2, args=(X2, 2, K_c, points1.shape[1]), method='lm')
 
     print(T_c2_c1_op)
-    R_c2_c1 = sc.linalg.expm(crossMatrix(OpOptim2.x[2:5]))
-    t_c2_c1 = np.array([np.sin(OpOptim.x[0])*np.cos(OpOptim.x[1]), np.sin(OpOptim.x[0])*np.sin(OpOptim.x[1]), np.cos(OpOptim.x[0])]).reshape(-1,1)
-    T_c2_c1_op = np.hstack((R_c2_c1, t_c2_c1))
-    P2_op = K_c @ T_c2_c1_op
-    T_c2_c1_op = np.vstack((T_c2_c1_op, np.array([0, 0, 0, 1])))
-    print(T_c2_c1_op)
+    R_c2_c1_2 = sc.linalg.expm(crossMatrix(OpOptim2.x[2:5]))
+    t_c2_c1_2 = np.array([np.sin(OpOptim.x[0])*np.cos(OpOptim.x[1]), np.sin(OpOptim.x[0])*np.sin(OpOptim.x[1]), np.cos(OpOptim.x[0])]).reshape(-1,1)
+    T_c2_c1_op_2 = np.hstack((R_c2_c1_2, t_c2_c1_2))
+    P2_op_2 = K_c @ T_c2_c1_op_2
+    T_c2_c1_op_2 = np.vstack((T_c2_c1_op_2, np.array([0, 0, 0, 1])))
+    print(T_c2_c1_op_2)
 
     # R_c3_c1 = sc.linalg.expm(crossMatrix(OpOptim.x[7:10]))
     # t_c3_c1 = np.array([np.sin(OpOptim.x[5])*np.cos(OpOptim.x[6]), np.sin(OpOptim.x[5])*np.sin(OpOptim.x[6]), np.cos(OpOptim.x[5])]).reshape(-1,1)
@@ -475,7 +475,7 @@ if __name__ == '__main__':
     #     points_3D_Op = np.vstack((points_3D_Op, np.concatenate((OpOptim.x[13+3*i: 13+3*i+3], np.array([1.0])) ,axis=0)))
 
     for i in range(worldPoints.shape[1]-1):
-        points_3D_Op = np.vstack((points_3D_Op, np.concatenate((OpOptim.x[8+3*i: 8+3*i+3], np.array([1.0])) ,axis=0)))
+        points_3D_Op = np.vstack((points_3D_Op, np.concatenate((OpOptim2.x[8+3*i: 8+3*i+3], np.array([1.0])) ,axis=0)))
 
 
     #### Draw 3D ################
@@ -488,7 +488,7 @@ if __name__ == '__main__':
     drawRefSystem(ax, np.eye(4, 4), '-', 'W')
     drawRefSystem(ax, T_w_c1, '-', 'C1')
     #drawRefSystem(ax, wTc1 @ np.linalg.inv(c2Tc1_Op), '-', 'C2_BA')
-    drawRefSystem(ax, T_w_c1 @ np.linalg.inv(T_c2_c1_op), '-', 'C2_BA_scaled')
+    drawRefSystem(ax, T_w_c1 @ np.linalg.inv(T_c2_c1_op_2), '-', 'C2_BA_scaled')
     drawRefSystem(ax, T_w_c2, '-', 'C2_True')
     # drawRefSystem(ax, T_w_c1 @ np.linalg.inv(T_c3_c1_op), '-', 'C3_BA_scaled')
     drawRefSystem(ax, T_w_c3, '-', 'C3_True')
