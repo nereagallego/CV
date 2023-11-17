@@ -82,6 +82,22 @@ def plotResidual(x,xProjected,strStyle):
         plt.plot([x[k, 0], xProjected[k, 0]], [x[k, 1], xProjected[k, 1]], strStyle)
         plt.plot(x[k, 0], x[k, 1], 'bo')
         plt.plot(xProjected[k, 0], xProjected[k, 1], 'rx')
+
+def plotResidual2(x,xProjected,strStyle, ax):
+    """
+        Plot the residual between an image point and an estimation based on a projection model.
+         -input:
+             x: Image points.
+             xProjected: Projected points.
+             strStyle: Line style.
+         -output: None
+         """
+
+    # Plot the line between each point and its projection also plot the point with a blue dot and the projection with a red cross
+    for k in range(x.shape[0]):
+        ax.plot([x[k, 0], xProjected[k, 0]], [x[k, 1], xProjected[k, 1]], strStyle)
+        ax.plot(x[k, 0], x[k, 1], 'bo')
+        ax.plot(xProjected[k, 0], xProjected[k, 1], 'rx')
     
 
 
@@ -379,7 +395,7 @@ if __name__ == '__main__':
     ax.scatter(worldPoints[0, :], worldPoints[1, :], worldPoints[2, :], marker='.')
     # plotNumbered3DPoints(ax, worldPoints, 'r', 0.1)
 
-    plt.title('3D points Bundle adjustment (red=True data)')
+    plt.title('3D points Bundle adjustment (blue=True data)')
     plt.show()
 
     #### Plot residual bundel adj ##############
@@ -390,24 +406,35 @@ if __name__ == '__main__':
     x2_p = P2_op @ points_3D_Op.T
     x2_p = x2_p / x2_p[2, :]
 
-    plt.figure(4)
-    plt.imshow(image_pers_1, cmap='gray', vmin=0, vmax=255)
-    plt.title('Residuals after Bundle adjustment Image1')
+    # plt.figure(4)
+    # plt.imshow(image_pers_1, cmap='gray', vmin=0, vmax=255)
+    # plt.title('Residuals after Bundle adjustment Image1')
     
-    plotResidual(points1.T, x1_p.T, 'k-')
+    # plotResidual(points1.T, x1_p.T, 'k-')
  
-    plt.draw()
+    # plt.draw()
+
+    # plt.show()
+
+    # plt.figure(5)
+    # plt.imshow(image_pers_2, cmap='gray', vmin=0, vmax=255)
+    # plt.title('Residuals after Bundle adjustment Image2')
+    # plotResidual(points2.T, x2_p.T, 'k-')
+
+    # plt.draw()
+
+    # plt.show()
+
+    fig, ax = plt.subplots(1,2, figsize=(10,5))
+    ax[0].imshow(image_pers_1, cmap='gray', vmin=0, vmax=255)
+    ax[0].set_title('Residuals after Bundle adjustment Image1')
+    plotResidual2(points1.T, x1_p.T, 'k-', ax[0])
+    ax[1].imshow(image_pers_2, cmap='gray', vmin=0, vmax=255)
+    ax[1].set_title('Residuals after Bundle adjustment Image2')
+    plotResidual2(points2.T, x2_p.T, 'k-', ax[1])
 
     plt.show()
 
-    plt.figure(5)
-    plt.imshow(image_pers_2, cmap='gray', vmin=0, vmax=255)
-    plt.title('Residuals after Bundle adjustment Image2')
-    plotResidual(points2.T, x2_p.T, 'k-')
-
-    plt.draw()
-
-    plt.show()
 
     # PART 3
 
@@ -443,36 +470,31 @@ if __name__ == '__main__':
     plt.show()
 
     # PART 4
-    # print("PART 4")
-
-    # Op = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0] + worldPoints[0:3].T.flatten().tolist()
-
-    # X = np.vstack((np.vstack((points1, points2)), points3))
-    # OpOptim = scOptim.least_squares(resBundleProjection_n_cameras, Op, args=(X, 3, K_c, points1.shape[1]), method='lm')
+    print("PART 4")
 
     Op2 = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0] + worldPoints[0:3].T.flatten().tolist()
 
     X2 = np.stack((points1.T, points2.T, points3.T))
     OpOptim2 = scOptim.least_squares(resBundleProjection_n_cameras, Op2, args=(X2, 3, K_c, points1.shape[1]), method='lm')
 
-    print(T_c2_c1_op)
+    T_c2_c1 = np.linalg.inv(T_w_c2) @ T_w_c1
+    T_c2_c1 = T_c2_c1 / T_c2_c1[3,3]
+    T_c3_c1 = np.linalg.inv(T_w_c3) @ T_w_c1
+    scale = np.linalg.norm(np.array([T_c2_c1[0,3], T_c2_c1[1,3], T_c2_c1[2,3]]))
+
     R_c2_c1_2 = sc.linalg.expm(crossMatrix(OpOptim2.x[2:5]))
     t_c2_c1_2 = np.array([np.sin(OpOptim2.x[0])*np.cos(OpOptim2.x[1]), np.sin(OpOptim2.x[0])*np.sin(OpOptim2.x[1]), np.cos(OpOptim2.x[0])]).reshape(-1,1)
     T_c2_c1_op_2 = np.hstack((R_c2_c1_2, t_c2_c1_2))
     P2_op_2 = K_c @ T_c2_c1_op_2
     T_c2_c1_op_2 = np.vstack((T_c2_c1_op_2, np.array([0, 0, 0, 1])))
-    print(T_c2_c1_op_2)
 
     R_c3_c1_2 = sc.linalg.expm(crossMatrix(OpOptim2.x[7:10]))
-    t_c3_c1_2 = np.array([np.sin(OpOptim2.x[5])*np.cos(OpOptim2.x[6]), np.sin(OpOptim2.x[5])*np.sin(OpOptim2.x[6]), np.cos(OpOptim2.x[5])]).reshape(-1,1)
+    t_c3_c1_2 = np.array([np.sin(OpOptim2.x[5])*np.cos(OpOptim2.x[6]), np.sin(OpOptim2.x[5])*np.sin(OpOptim2.x[6]), np.cos(OpOptim2.x[5])]).reshape(-1,1) 
     T_c3_c1_op_2 = np.hstack((R_c3_c1_2, t_c3_c1_2))
     P3_op_2 = K_c @ T_c3_c1_op_2
     T_c3_c1_op_2 = np.vstack((T_c3_c1_op_2, np.array([0, 0, 0, 1])))
 
     points_3D_Op = np.concatenate((OpOptim2.x[10: 10+3], np.array([1.0])), axis=0)
-
-    # for i in range(worldPoints.shape[1]-1):
-    #     points_3D_Op = np.vstack((points_3D_Op, np.concatenate((OpOptim.x[13+3*i: 13+3*i+3], np.array([1.0])) ,axis=0)))
 
     for i in range(worldPoints.shape[1]-1):
         points_3D_Op = np.vstack((points_3D_Op, np.concatenate((OpOptim2.x[10+3+3*i: 10+3+3*i+3], np.array([1.0])) ,axis=0)))
@@ -501,7 +523,57 @@ if __name__ == '__main__':
     ax.scatter(worldPoints[0, :], worldPoints[1, :], worldPoints[2, :], marker='.')
     # plotNumbered3DPoints(ax, worldPoints, 'r', 0.1)
 
-    plt.title('3D points Bundle adjustment (red=True data)')
+    plt.title('3D points Bundle adjustment (blue=True data)')
     plt.show()
 
+    #### Plot residual bundel adj ##############
+    idem = np.append(np.eye(3), np.zeros((3, 1)), axis=1)
+    P1_est = K_c @ idem
+    x1_p = P1_est @ points_3D_Op.T
+    x1_p = x1_p / x1_p[2, :]
+    x2_p = P2_op_2 @ points_3D_Op.T
+    x2_p = x2_p / x2_p[2, :]
+    x3_p = P3_op_2 @ points_3D_Op.T
+    x3_p = x3_p / x3_p[2, :]
+
+    # plt.figure(4)
+    # plt.imshow(image_pers_1, cmap='gray', vmin=0, vmax=255)
+    # plt.title('Residuals after Bundle adjustment Image1')
+    
+    # plotResidual(points1.T, x1_p.T, 'k-')
+ 
+    # plt.draw()
+
+    # plt.show()
+
+    # plt.figure(5)
+    # plt.imshow(image_pers_2, cmap='gray', vmin=0, vmax=255)
+    # plt.title('Residuals after Bundle adjustment Image2')
+    # plotResidual(points2.T, x2_p.T, 'k-')
+
+    # plt.draw()
+
+    # plt.show()
+
+    # plt.figure(6)
+    # plt.imshow(image_pers_3, cmap='gray', vmin=0, vmax=255)
+    # plt.title('Residuals after Bundle adjustment Image3')
+    # plotResidual(points3.T, x3_p.T, 'k-')
+
+    # plt.draw()
+
+    # plt.show()
+
+    fig, ax = plt.subplots(1,3, figsize=(20,10))
+    ax[0].imshow(image_pers_1, cmap='gray', vmin=0, vmax=255)
+    ax[0].set_title('Residuals after Bundle adjustment Image1')
+    plotResidual2(points1.T, x1_p.T, 'k-', ax[0])
+    ax[1].imshow(image_pers_2, cmap='gray', vmin=0, vmax=255)
+    ax[1].set_title('Residuals after Bundle adjustment Image2')
+    plotResidual2(points2.T, x2_p.T, 'k-', ax[1])
+    ax[2].imshow(image_pers_3, cmap='gray', vmin=0, vmax=255)
+    ax[2].set_title('Residuals after Bundle adjustment Image3')
+    plotResidual2(points3.T, x3_p.T, 'k-', ax[2])
+
+    plt.show()
 
