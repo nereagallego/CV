@@ -453,10 +453,10 @@ if __name__ == '__main__':
     Op = [0.0, 0.0, 0.0, 0.0, 0.0] + worldPoints[0:3].T.flatten().tolist()
 
     X = np.stack((points1.T, points2.T))
-    OpOptim = scOptim.least_squares(resBundleProjection_n_cameras, Op, args=(X, 2, K_c, points1.shape[1]), method='lm')
+    OpOptim2 = scOptim.least_squares(resBundleProjection_n_cameras, Op, args=(X, 2, K_c, points1.shape[1]), method='lm')
 
     print(T_c2_c1_op)
-    R_c2_c1 = sc.linalg.expm(crossMatrix(OpOptim.x[2:5]))
+    R_c2_c1 = sc.linalg.expm(crossMatrix(OpOptim2.x[2:5]))
     t_c2_c1 = np.array([np.sin(OpOptim.x[0])*np.cos(OpOptim.x[1]), np.sin(OpOptim.x[0])*np.sin(OpOptim.x[1]), np.cos(OpOptim.x[0])]).reshape(-1,1)
     T_c2_c1_op = np.hstack((R_c2_c1, t_c2_c1))
     P2_op = K_c @ T_c2_c1_op
