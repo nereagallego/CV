@@ -269,7 +269,7 @@ def resBundleProjection_n_cameras(Op, xData, nCameras, K_c, nPoints):
     for i in range(nCameras):
         projection = theta_ext[i] @ X_3D.T
         projection = projection[:2, :] / projection[2, :]
-        res.append(Xpoints[i] - projection.T)
+        res.append((Xpoints[i] - projection.T).flatten())
 
     # print(res)
     return np.array(res).flatten()
