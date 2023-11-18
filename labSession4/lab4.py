@@ -270,7 +270,11 @@ def resBundleProjection_n_cameras(Op, xData, nCameras, K_c, nPoints):
     # theta_ext.append(theta_ext_2)
     for i in range(nCameras - 1):
         R = sc.linalg.expm(crossMatrix(Op[2+5*i:5+5*i]))
-        t = np.array([np.sin(Op[5*i])*np.cos(Op[1+5*i]), np.sin(Op[0+5*i])*np.sin(Op[1+5*i]), np.cos(Op[0+5*i])]).reshape(-1,1)
+        if i == 0:
+            # No se que hay que poner aqui
+            t = np.array([np.sin(Op[0])*np.cos(Op[1]), np.sin(Op[0])*np.sin(Op[1]), np.cos(Op[0])]).reshape(-1,1)
+        else:
+            t = np.array([np.sin(Op[5*i])*np.cos(Op[1+5*i]), np.sin(Op[5*i])*np.sin(Op[1+5*i]), np.cos(Op[5*i])]).reshape(-1,1)
         T = np.hstack((R, t))
         theta_ext.append(K_c @ T)
 
