@@ -126,6 +126,7 @@ def points_in_front_of_both_cameras(x1, x2, T, K):
 
     in_front = 0
 
+    points_front = []
     for point in points3d:
         if point[2] < 0:
             continue
@@ -134,8 +135,9 @@ def points_in_front_of_both_cameras(x1, x2, T, K):
         pointFrame = T @ point.reshape(-1,1)
         if pointFrame[2] > 0:
             in_front += 1
+            points_front.append(point)
     
-    return in_front
+    return in_front, points_front
 
 
 # Decompose the Essential matrix
@@ -163,10 +165,16 @@ def decompose_essential_matrix(x1, x2, E, K):
     solutions.append(np.hstack((R_90,-U[:,2].reshape(-1,1)))) # R - 90 - t
     
 
-    points_front = [ points_in_front_of_both_cameras(x1, x2, T, K) for T in solutions]
+    # points_front = [ points_in_front_of_both_cameras(x1, x2, T, K) for T in solutions]
 
+    points_front = []
+    points = []
+    for T in solutions:
+        v1, v2 = points_in_front_of_both_cameras(x1, x2, T, K)
+        points_front.append(v1)
+        points.append(v2)
     T = solutions[np.argmax(points_front)]
-    return T
+    return T, np.array(points[np.argmax(points_front)])
 
 def compute_essential_matrix(F, K):
     E = K.T @ F @ K
@@ -252,38 +260,39 @@ def resBundleProjection_n_cameras(Op, xData, nCameras, K_c, nPoints):
     '''
     Op[0:1] -> theta, phi
     Op[2:5] -> Rx,Ry,Rz
-    Op[6:7] -> theta, phi
-    Op[8:11] -> Rx,Ry,Rz
+    Op[6:8] -> tx, ty, tz (camera 3 in advance)
+    Op[9:11] -> Rx,Ry,Rz
     ...
     Op[] -> 3DXx,3DXy,3DXz
     '''
     # Bundle adjustment using least squares function
     idem = np.append(np.eye(3), np.zeros((3, 1)), axis=1)
-    # R = sc.linalg.expm(crossMatrix(Op[2:5]))
-    # t = np.array([np.sin(Op[0])*np.cos(Op[1]), np.sin(Op[0])*np.sin(Op[1]), np.cos(Op[0])]).reshape(-1,1)
+
     theta_ext_1 = K_c @ idem
-    # T = np.hstack((R, t))
-    # theta_ext_2 =  K_c @ T #Proyection matrix
+
 
     theta_ext = []
     theta_ext.append(theta_ext_1)
-    # theta_ext.append(theta_ext_2)
+
     for i in range(nCameras - 1):
-        R = sc.linalg.expm(crossMatrix(Op[2+5*i:5+5*i]))
+        # R = sc.linalg.expm(crossMatrix(Op[2+5*i:5+5*i]))
         if i == 0:
             # No se que hay que poner aqui
             t = np.array([np.sin(Op[0])*np.cos(Op[1]), np.sin(Op[0])*np.sin(Op[1]), np.cos(Op[0])]).reshape(-1,1)
+            R = sc.linalg.expm(crossMatrix(Op[2+5*i:5+5*i]))
         else:
-            t = np.array([np.sin(Op[5*i])*np.cos(Op[1+5*i]), np.sin(Op[5*i])*np.sin(Op[1+5*i]), np.cos(Op[5*i])]).reshape(-1,1)
+            t = np.array([Op[6*(i-1)+5],Op[6*(i-1)+6],Op[6*(i-1)+7]]).reshape(-1,1)
+            R = sc.linalg.expm(crossMatrix(Op[6*(i-1)+8:6*(i-1)+11]))
         T = np.hstack((R, t))
         theta_ext.append(K_c @ T)
+
 
     # Compute the residuals
    
     Xpoints = xData
     # Xpoints = xData.reshape(nCameras, nPoints, 2)
-
-    X_3D = np.hstack((Op[(nCameras-1)*5:].reshape(-1, 3), np.ones((nPoints, 1))))
+    idx_3D = 5 + (nCameras-2)*6
+    X_3D = np.hstack((Op[idx_3D:].reshape(-1, 3), np.ones((nPoints, 1))))
     # print(X_3D)
     res = []
     for i in range(nCameras):
@@ -293,6 +302,45 @@ def resBundleProjection_n_cameras(Op, xData, nCameras, K_c, nPoints):
 
     # print(res)
     return np.array(res).flatten()
+
+def normalizationMatrix(nx,ny):
+    """
+    Estimation of fundamental matrix(F) by matched n matched points.
+    n >= 8 to assure the algorithm.
+
+    -input:
+        nx: number of columns of the matrix
+        ny: number of rows of the matrix
+    -output:
+        Nv: normalization matrix such that xN = Nv @ x
+    """
+    Nv = np.array([[1/nx, 0, -1/2], [0, 1/ny, -1/2], [0, 0, 1]])
+    return Nv
+
+def compute_fundamental_matrix(points1, points2, nx1, ny1, nx2, ny2):
+    # Normalize the points
+    # N1 = normalizationMatrix(nx1, ny1)
+    # N2 = normalizationMatrix(nx2, ny2)
+    # points1 = N1 @ points1
+    # points2 = N2 @ points2
+    # Compute the fundamental matrix
+    # print(points1.shape[0], " ", points1.shape[1])
+    A = np.zeros((points1.shape[1], 9))
+    for i in range(points1.shape[1]):
+        A[i, :] = [points1[0, i] * points2[0, i], points2[0, i] * points1[1, i], points2[0, i], points1[0, i] * points2[1, i], points1[1, i] * points2[1, i], points2[1,i], points1[0,i], points1[1,i], 1]
+        # A[i, :] = [points1[i,0] * points2[i,0], points2[i,0] * points1[i,0], points2[i,0], points1[i,0] * points2[i, 1], points1[i, 1] * points2[i, 1], points2[i,1], points1[i,0], points1[i,1], 1]
+    
+    _, _, V = np.linalg.svd(A)
+
+    # compute the fundamental matrix from the right singular vector corresponding to the smallest singular value
+    F = V[-1, :].reshape((3, 3))
+    U, S, V = np.linalg.svd(F)
+
+    # enforce rank 2 constraint
+    S[2] = 0
+    F = np.dot(U, np.dot(np.diag(S), V))
+    # F = np.dot(N2.T, np.dot(F, N1))
+    return F/F[2,2]
 
 if __name__ == '__main__':
 
@@ -326,7 +374,7 @@ if __name__ == '__main__':
     worldPoints = np.loadtxt('X_w.txt')
 
     E_24 = compute_essential_matrix(F, K_c)
-    solutions_24 = decompose_essential_matrix(points1, points2, E_24, K_c)
+    solutions_24, _ = decompose_essential_matrix(points1, points2, E_24, K_c)
     # add last row to make it 4x4
     solutions_24 = np.vstack((solutions_24, np.array([0, 0, 0, 1])))
     
@@ -476,7 +524,25 @@ if __name__ == '__main__':
     # PART 4
     print("PART 4")
 
-    Op2 = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0] + worldPoints[0:3].T.flatten().tolist()
+    F_matches = compute_fundamental_matrix(points1, points2, image_pers_1.shape[1], image_pers_1.shape[0], image_pers_2.shape[1], image_pers_2.shape[0])
+    E_matches = compute_essential_matrix(F_matches, K_c)
+    Rt_chosen, X_3d = decompose_essential_matrix(points1, points2, E_matches, K_c)
+    R_c2_c1_chosen = Rt_chosen[:, 0:3]
+    t_c2_c1_chosen = Rt_chosen[:, 3].reshape(-1,1)
+
+    T_c2_c1 = np.hstack((R_c2_c1_chosen, t_c2_c1_chosen))
+    T_c2_c1 = np.vstack((T_c2_c1, np.array([0, 0, 0, 1])))
+    T_c3_c1 = T_c3_c1_pnp
+    R_c3_c1 = T_c3_c1[0:3, 0:3]
+    t_c3_c1 = T_c3_c1[0:3, 3].reshape(-1,1)
+    elevation2 = np.arccos(t_c2_c1_chosen[2])
+    azimuth2 = np.arcsin(t_c2_c1_chosen[0] / np.sin(elevation2))
+
+    # print(len(X_3d))
+    print(X_3d[:,0:3].shape)
+    print(worldPoints.shape)
+    Op2 = [azimuth2, elevation2] + crossMatrixInv(sc.linalg.logm(R_c2_c1_chosen)) + [t_c3_c1[0], t_c3_c1[1], t_c3_c1[2]] + crossMatrixInv(sc.linalg.logm(R_c3_c1)) + X_3d[:,0:3].flatten().tolist()
+    # Op2 = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0] + worldPoints[0:3].T.flatten().tolist()
 
     X2 = np.stack((points1.T, points2.T, points3.T))
     OpOptim2 = scOptim.least_squares(resBundleProjection_n_cameras, Op2, args=(X2, 3, K_c, points1.shape[1]), method='lm')
@@ -487,21 +553,22 @@ if __name__ == '__main__':
     scale = np.linalg.norm(np.array([T_c2_c1[0,3], T_c2_c1[1,3], T_c2_c1[2,3]]))
 
     R_c2_c1_2 = sc.linalg.expm(crossMatrix(OpOptim2.x[2:5]))
-    t_c2_c1_2 = np.array([np.sin(OpOptim2.x[0])*np.cos(OpOptim2.x[1]), np.sin(OpOptim2.x[0])*np.sin(OpOptim2.x[1]), np.cos(OpOptim2.x[0])]).reshape(-1,1)
-    T_c2_c1_op_2 = np.hstack((R_c2_c1_2, t_c2_c1_2))
+    t_c2_c1_2 = np.array([np.sin(OpOptim2.x[0])*np.cos(OpOptim2.x[1]), np.sin(OpOptim2.x[0])*np.sin(OpOptim2.x[1]), np.cos(OpOptim2.x[0])]).reshape(-1,1) * scale
+    T_c2_c1_op_2 = np.hstack((R_c2_c1_2, t_c2_c1_2)) 
     P2_op_2 = K_c @ T_c2_c1_op_2
     T_c2_c1_op_2 = np.vstack((T_c2_c1_op_2, np.array([0, 0, 0, 1])))
 
-    R_c3_c1_2 = sc.linalg.expm(crossMatrix(OpOptim2.x[7:10]))
-    t_c3_c1_2 = np.array([np.sin(OpOptim2.x[5])*np.cos(OpOptim2.x[6]), np.sin(OpOptim2.x[5])*np.sin(OpOptim2.x[6]), np.cos(OpOptim2.x[5])]).reshape(-1,1) 
+    R_c3_c1_2 = sc.linalg.expm(crossMatrix(OpOptim2.x[8:11]))
+    # t_c3_c1_2 = np.array([np.sin(OpOptim2.x[5])*np.cos(OpOptim2.x[6]), np.sin(OpOptim2.x[5])*np.sin(OpOptim2.x[6]), np.cos(OpOptim2.x[5])]).reshape(-1,1) 
+    t_c3_c1_2 = OpOptim2.x[5:8].reshape(-1,1) * scale
     T_c3_c1_op_2 = np.hstack((R_c3_c1_2, t_c3_c1_2))
     P3_op_2 = K_c @ T_c3_c1_op_2
     T_c3_c1_op_2 = np.vstack((T_c3_c1_op_2, np.array([0, 0, 0, 1])))
 
-    points_3D_Op = np.concatenate((OpOptim2.x[10: 10+3], np.array([1.0])), axis=0)
+    points_3D_Op = np.concatenate((OpOptim2.x[11: 11+3], np.array([1.0])), axis=0)
 
     for i in range(worldPoints.shape[1]-1):
-        points_3D_Op = np.vstack((points_3D_Op, np.concatenate((OpOptim2.x[10+3+3*i: 10+3+3*i+3], np.array([1.0])) ,axis=0)))
+        points_3D_Op = np.vstack((points_3D_Op, np.concatenate((OpOptim2.x[11+3+3*i: 11+3+3*i+3], np.array([1.0])) ,axis=0)))
 
 
     #### Draw 3D ################
@@ -519,7 +586,7 @@ if __name__ == '__main__':
     drawRefSystem(ax, T_w_c1 @ np.linalg.inv(T_c3_c1_op_2), '-', 'C3_BA_scaled')
     drawRefSystem(ax, T_w_c3, '-', 'C3_True')
 
-    points_Op = T_w_c1 @ (points_3D_Op).T
+    points_Op = T_w_c1 @ (points_3D_Op * scale).T
 
     ax.scatter(points_Op[0, :], points_Op[1, :], points_Op[2, :], marker='.')
     # plotNumbered3DPoints(ax, points_Op, 'b', 0.1)
@@ -532,6 +599,21 @@ if __name__ == '__main__':
 
     #### Plot residual bundel adj ##############
     idem = np.append(np.eye(3), np.zeros((3, 1)), axis=1)
+
+    R_c2_c1_2 = sc.linalg.expm(crossMatrix(OpOptim2.x[2:5]))
+    t_c2_c1_2 = np.array([np.sin(OpOptim2.x[0])*np.cos(OpOptim2.x[1]), np.sin(OpOptim2.x[0])*np.sin(OpOptim2.x[1]), np.cos(OpOptim2.x[0])]).reshape(-1,1) 
+    T_c2_c1_op_2 = np.hstack((R_c2_c1_2, t_c2_c1_2)) 
+    P2_op_2 = K_c @ T_c2_c1_op_2
+    T_c2_c1_op_2 = np.vstack((T_c2_c1_op_2, np.array([0, 0, 0, 1])))
+
+    R_c3_c1_2 = sc.linalg.expm(crossMatrix(OpOptim2.x[8:11]))
+    # t_c3_c1_2 = np.array([np.sin(OpOptim2.x[5])*np.cos(OpOptim2.x[6]), np.sin(OpOptim2.x[5])*np.sin(OpOptim2.x[6]), np.cos(OpOptim2.x[5])]).reshape(-1,1) 
+    t_c3_c1_2 = OpOptim2.x[5:8].reshape(-1,1) 
+    T_c3_c1_op_2 = np.hstack((R_c3_c1_2, t_c3_c1_2))
+    P3_op_2 = K_c @ T_c3_c1_op_2
+    T_c3_c1_op_2 = np.vstack((T_c3_c1_op_2, np.array([0, 0, 0, 1])))
+
+
     P1_est = K_c @ idem
     x1_p = P1_est @ points_3D_Op.T
     x1_p = x1_p / x1_p[2, :]
