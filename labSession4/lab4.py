@@ -413,7 +413,38 @@ if __name__ == '__main__':
     # PART 2.1
    
     print("PART 2.1")
-    Op = [0.0, 0.0, 0.0, 0.0, 0.0] + worldPoints[0:3].T.flatten().tolist()
+
+    F_matches = compute_fundamental_matrix(points1, points2, image_pers_1.shape[1], image_pers_1.shape[0], image_pers_2.shape[1], image_pers_2.shape[0])
+    E_matches = compute_essential_matrix(F_matches, K_c)
+    Rt_chosen, X_3d = decompose_essential_matrix(points1, points2, E_matches, K_c)
+    R_c2_c1_chosen = Rt_chosen[:, 0:3]
+    t_c2_c1_chosen = Rt_chosen[:, 3].reshape(-1,1)
+
+    elevation = np.arccos(t_c2_c1_chosen[2])
+    azimuth = np.arcsin(t_c2_c1_chosen[0] / np.sin(elevation))
+
+    Op = [azimuth, elevation] + crossMatrixInv(sc.linalg.logm(R_c2_c1_chosen)) + X_3d[:,0:3].flatten().tolist()
+    Op = np.array(Op, dtype="object")
+    # Op = [0.0, 0.0, 0.0, 0.0, 0.0] + worldPoints[0:3].T.flatten().tolist()
+
+    res = resBundleProjection(Op, points1, points2, K_c, points1.shape[1])
+    # show the residuals 
+
+    P1_est = K_c @ idem
+    x1_p = P1_est @ X_3d.T
+    x1_p = x1_p / x1_p[2, :]
+    x2_p = P2 @ X_3d.T
+    x2_p = x2_p / x2_p[2, :]
+
+    fig, ax = plt.subplots(1,2, figsize=(10,5))
+    ax[0].imshow(image_pers_1, cmap='gray', vmin=0, vmax=255)
+    ax[0].set_title('Residuals after Bundle adjustment Image1')
+    plotResidual2(points1.T, x1_p.T, 'k-', ax[0])
+    ax[1].imshow(image_pers_2, cmap='gray', vmin=0, vmax=255)
+    ax[1].set_title('Residuals after Bundle adjustment Image2')
+    plotResidual2(points2.T, x2_p.T, 'k-', ax[1])
+
+    # Make the optimization
     
     OpOptim = scOptim.least_squares(resBundleProjection, Op, args=(points1, points2, K_c, points1.shape[1]), method='lm')
     R_c2_c1 = sc.linalg.expm(crossMatrix(OpOptim.x[2:5]))
