@@ -159,7 +159,7 @@ def triangulation(x1, x2, T_w_c1, T_w_c2, K1, K2, D1, D2, T_c1_c2):
 
         points = V.T[:, -1]
 
-        print(points)
+        # print(points)
         points_3d.append(points/points[3])
 
     return np.array(points_3d)
@@ -212,7 +212,7 @@ if __name__ == '__main__':
 
     # 2.2
     points_3d = triangulation(x1, x2, T_w_c1, T_w_c2, Kc_1, Kc_2, d1, d2, T_wa_wb_gt)
-    # print('points_3d = ', points_3d)
+    print('points_3d = ', points_3d)
 
     print(points_3d.shape)
     # x1_p = kannalaBrandtProjection(Kc_1, d1, points_3d)
