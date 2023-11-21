@@ -421,9 +421,9 @@ if __name__ == '__main__':
     t_c2_c1_chosen = Rt_chosen[:, 3].reshape(-1,1)
 
     elevation = np.arccos(t_c2_c1_chosen[2])
-    azimuth = np.arcsin(t_c2_c1_chosen[0] / np.sin(elevation))
+    azimuth = np.arctan2(t_c2_c1_chosen[1],t_c2_c1_chosen[0]) #np.arcsin(t_c2_c1_chosen[0] / np.sin(elevation))
 
-    Op = [azimuth, elevation] + crossMatrixInv(sc.linalg.logm(R_c2_c1_chosen)) + X_3d[:,0:3].flatten().tolist()
+    Op = [ elevation,azimuth] + crossMatrixInv(sc.linalg.logm(R_c2_c1_chosen)) + X_3d[:,0:3].flatten().tolist()
     Op = np.array(Op, dtype="object")
     # Op = [0.0, 0.0, 0.0, 0.0, 0.0] + worldPoints[0:3].T.flatten().tolist()
 
@@ -617,7 +617,7 @@ if __name__ == '__main__':
     drawRefSystem(ax, T_w_c1 @ np.linalg.inv(T_c3_c1_op_2), '-', 'C3_BA_scaled')
     drawRefSystem(ax, T_w_c3, '-', 'C3_True')
 
-    points_Op = T_w_c1 @ (points_3D_Op * scale).T
+    points_Op = T_w_c1 @ np.diag([scale,scale,scale,1])@ (points_3D_Op).T
 
     ax.scatter(points_Op[0, :], points_Op[1, :], points_Op[2, :], marker='.')
     # plotNumbered3DPoints(ax, points_Op, 'b', 0.1)
