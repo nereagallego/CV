@@ -36,6 +36,18 @@ def drawRefSystem(ax, T_w_c, strStyle, nameStr):
     draw3DLine(ax, T_w_c[0:3, 3:4], T_w_c[0:3, 3:4] + T_w_c[0:3, 2:3], strStyle, 'b', 1)
     ax.text(np.squeeze( T_w_c[0, 3]+0.1), np.squeeze( T_w_c[1, 3]+0.1), np.squeeze( T_w_c[2, 3]+0.1), nameStr)
 
+def plotNumberedImagePoints(x,strColor,offset):
+    """
+        Plot indexes of points on a 2D image.
+         -input:
+             x: Points coordinates.
+             strColor: Color of the text.
+             offset: Offset from the point to the text.
+         -output: None
+         """
+    for k in range(x.shape[1]):
+        plt.text(x[0, k]+offset, x[1, k]+offset, str(k), color=strColor)
+
 def plotNumbered3DPoints(ax, X,strColor, offset):
     """
         Plot indexes of points on a 3D plot.
@@ -83,7 +95,7 @@ def kannalaBrandtProjection(K, D, X):
         d = theta + D[0] * theta**3 + D[1] * theta**5 + D[2] * theta**7 + D[3] * theta**9
         u = K @ np.array([[d * np.cos(phi)], [d * np.sin(phi)], [1]])  
         u_vectors.append(u)
-    return np.array(u_vectors)
+    return np.array(u_vectors).squeeze()
 
 def kannalaBrandtUnprojection(K, D, u):
     """
@@ -183,6 +195,7 @@ if __name__ == '__main__':
     T_wa_wb_seed = np.loadtxt('T_wawb_seed.txt')
     T_w_c1 = np.loadtxt('T_wc1.txt')
     T_w_c2 = np.loadtxt('T_wc2.txt')
+    T_l_r = np.loadtxt('T_leftRight.txt')
 
     img1 = cv2.imread('fisheye1_frameA.png')
     img2 = cv2.imread('fisheye2_frameA.png')
@@ -198,22 +211,39 @@ if __name__ == '__main__':
 
     X = np.array([[3,2,10,1], [-5,6,7,1],[1,5,14,1]])
     u1 = kannalaBrandtProjection(Kc_1, d1, X)
-    print('u1 = ', u1)
+    # print('u1 = ', u1)
 
     u2 = kannalaBrandtProjection(Kc_2, d2, X)
-    print('u2 = ', u2)
+    # print('u2 = ', u2)
 
     u = np.array([[503.387,450.1594,1], [267.9465,580.4671,1],[441.0609,493.0671,1]])
     X1 = kannalaBrandtUnprojection(Kc_1, d1, u)
-    print('X1 = ', X1)
+    # print('X1 = ', X1)
 
     X2 = kannalaBrandtUnprojection(Kc_2, d2, u)
-    print('X2 = ', X2)
+    # print('X2 = ', X2)
 
     # 2.2
-    points_3d = triangulation(x1, x2, T_w_c1, T_w_c2, Kc_1, Kc_2, d1, d2, T_wa_wb_gt)
-    print('points_3d = ', points_3d)
+    points_3d = triangulation(x1, x2, T_w_c1, T_w_c2, Kc_1, Kc_2, d1, d2, T_l_r)
+    # print('points_3d = ', points_3d)
 
     print(points_3d.shape)
-    # x1_p = kannalaBrandtProjection(Kc_1, d1, points_3d)
+    points_3d_1 = (T_l_r @ points_3d.T).T
+    x1_p = kannalaBrandtProjection(Kc_1, d1, points_3d_1)
+    x2_p = kannalaBrandtProjection(Kc_2, d2, points_3d)
+    print(x1_p.shape)
+    print(x2_p.shape)
+
+
+    fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+    ax[0].imshow(img1)
+    ax[0].set_title('Reprojection 3D points Camera1 A')
+    plotResidual(x1.T, x1_p, 'k-', ax[0])    
+
+    ax[1].imshow(img2)
+    ax[1].set_title('Reprojection 3D points Camera2 A')
+    plotResidual(x2.T, x2_p, 'k-', ax[1])
+    plt.show()
+    
+    
 
