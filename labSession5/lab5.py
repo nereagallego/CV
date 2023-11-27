@@ -245,5 +245,25 @@ if __name__ == '__main__':
     plotResidual(x2.T, x2_p, 'k-', ax[1])
     plt.show()
     
+    T_c1a_c1b = np.linalg.inv(T_w_c1) @ T_wa_wb_gt @ T_w_c1
+    points_3d = triangulation(x1, x3, T_w_c1, T_w_c2, Kc_1, Kc_2, d1, d2, T_c1a_c1b)
+
+    points_3d_1 = (T_c1a_c1b @ points_3d.T).T
+    x1_p = kannalaBrandtProjection(Kc_1, d1, points_3d_1)
+    x3_p = kannalaBrandtProjection(Kc_2, d2, points_3d)
+
+    fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+    ax[0].imshow(img1)
+    ax[0].set_title('Reprojection 3D points Camera1 A')
+    plotResidual(x1.T, x1_p, 'k-', ax[0])
+
+    ax[1].imshow(img3)
+    ax[1].set_title('Reprojection 3D points Camera1 B')
+    plotResidual(x3.T, x3_p, 'k-', ax[1])
+    plt.show()
+
+    # PART 3
+    print('PART 3')
+
     
 
