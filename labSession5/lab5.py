@@ -371,8 +371,6 @@ if __name__ == '__main__':
 
     ax.scatter(points_3d_op[0, :], points_3d_op[1, :], points_3d_op[2, :], c='r', marker='x', s=10)
 
-    ax.scatter(points_3d[:,0], points_3d[:,1], points_3d[:,2], c='b', marker='o', s=10)
-
     plt.title('3D model Bundle Adjustment')
     plt.show()
 
