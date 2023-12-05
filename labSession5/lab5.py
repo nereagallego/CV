@@ -6,6 +6,8 @@
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
+import scipy as sc
+import scipy.optimize as scOptim
 
 def draw3DLine(ax, xIni, xEnd, strStyle, lColor, lWidth):
     """
@@ -139,8 +141,6 @@ def triangulation(x1, x2, T_w_c1, T_w_c2, K1, K2, D1, D2, T_c1_c2):
              X: Triangulated points.
          """
     X = []
-    K1_inv = np.linalg.inv(K1)
-    K2_inv = np.linalg.inv(K2)
 
     v1 = kannalaBrandtUnprojection(K1, D1, x1.T)
     v2 = kannalaBrandtUnprojection(K2, D2, x2.T)
@@ -175,6 +175,71 @@ def triangulation(x1, x2, T_w_c1, T_w_c2, K1, K2, D1, D2, T_c1_c2):
         points_3d.append(points/points[3])
 
     return np.array(points_3d)
+
+def crossMatrixInv(M):
+    x = [M[2, 1], M[0, 2], M[1, 0]]
+    return x
+
+def crossMatrix(x):
+    M = np.array([[0, -x[2], x[1]],
+    [x[2], 0, -x[0]],
+    [-x[1], x[0], 0]], dtype="object")
+    return M
+
+def resBundleProjection_n_cameras(Op, xData, nPoints, K1, K2, D1, D2, T_w_c1, T_w_c2):
+    """
+    -input:
+    Op: Optimization parameters: this must include a
+    paramtrization for T_21 (reference 1 seen from reference 2)
+    in a proper way and for X1 (3D points in ref 1)
+    x1Data: (3xnPoints) 2D points on image 1 (homogeneous
+    coordinates)
+    x2Data: (3xnPoints) 2D points on image 2 (homogeneous
+    coordinates)
+    K_c: (3x3) Intrinsic calibration matrix
+    nPoints: Number of points
+    -output:
+    res: residuals from the error between the 2D matched points
+    and the projected points from the 3D points
+    (2 equations/residuals per 2D point)
+
+    ASSUMING AT LEAST 3 CAMERAS !!!
+    """
+
+    '''
+    Op[0:3] -> tx, ty, tz (camera 2 in advance)
+    Op[3:6] -> Rx,Ry,Rz
+    ...
+    Op[] -> 3DXx,3DXy,3DXz (respect to camera 1B)
+    '''
+    # Bundle adjustment using least squares function
+    R_wa_wb = sc.linalg.expm(crossMatrix(Op[3:6]))
+    t_wa_wb = Op[0:3].reshape(-1, 1)
+    T_wa_wb = np.hstack((R_wa_wb, t_wa_wb))
+    T_wa_wb = np.vstack((T_wa_wb, np.array([0, 0, 0, 1])))
+    
+
+    X_3D = np.hstack((Op[6:].reshape(-1, 3), np.ones((nPoints, 1))))
+    T_c1a_c1b = np.linalg.inv(T_w_c1) @ T_wa_wb @ T_w_c1
+    T_c1_c2 = np.linalg.inv(T_w_c1) @ T_w_c2
+
+    x1_p = kannalaBrandtProjection(K1, D1, (T_c1a_c1b @ X_3D.T).T)
+    x2_p = kannalaBrandtProjection(K2, D2, (np.linalg.inv(T_c1_c2) @ T_c1a_c1b @ X_3D.T).T)
+    x3_p = kannalaBrandtProjection(K1, D1, X_3D)
+    x4_p = kannalaBrandtProjection(K2, D2, (np.linalg.inv(T_c1_c2)@X_3D.T).T)
+
+    x1 = xData[0:3, :] / xData[2, :]
+    x2 = xData[3:6, :] / xData[5, :]
+    x3 = xData[6:9, :] / xData[8, :]
+    x4 = xData[9:12, :] / xData[11, :]
+
+    res = np.concatenate((x1[0:2,:].T - x1_p[:,0:2], x2[0:2,:].T - x2_p[:,0:2], x3[0:2,:].T - x3_p[:,0:2], x4[0:2,:].T - x4_p[:,0:2]), axis=0)
+    return res.flatten()
+    
+
+    
+
+    
 
 
 if __name__ == '__main__':
@@ -265,5 +330,51 @@ if __name__ == '__main__':
     # PART 3
     print('PART 3')
 
+    T_c1a_c1b_seed = np.linalg.inv(T_w_c1) @ T_wa_wb_seed @ T_w_c1
+
+    points_3d = triangulation(x1, x3, T_w_c1, T_w_c2, Kc_1, Kc_2, d1, d2, T_c1a_c1b_seed)
+    print(points_3d.shape)
+    R_wa_wb_seed = T_wa_wb_seed[0:3, 0:3]
+    t_wa_wb_seed = T_wa_wb_seed[0:3, 3]
     
+
+    Op = np.hstack((t_wa_wb_seed, crossMatrixInv(sc.linalg.logm(R_wa_wb_seed)), points_3d[:,0:3].flatten()))
+    # print(Op)
+
+    OpOptim = scOptim.least_squares(resBundleProjection_n_cameras, Op, args=(np.concatenate((x1,x2, x3,x4), axis=0), x1.shape[1], Kc_1, Kc_2, d1, d2, T_w_c1, T_w_c2), method='lm', verbose=2)
+    print(OpOptim.x)
+
+    # Print 3D model
+    R_wa_wb_op = sc.linalg.expm(crossMatrix(OpOptim.x[3:6]))
+    t_wa_wb_op = OpOptim.x[0:3].reshape(-1, 1)
+    T_wa_wb_op = np.hstack((R_wa_wb_op, t_wa_wb_op))
+    T_wa_wb_op = np.vstack((T_wa_wb_op, np.array([0, 0, 0, 1])))
+    
+    points_3d_op = OpOptim.x[6:].reshape(-1, 3)
+    points_3d_op = np.hstack((points_3d_op, np.ones((points_3d_op.shape[0], 1))))
+
+    points_3d_op = T_wa_wb_op @ T_w_c1 @ points_3d_op.T
+
+    fig3D = plt.figure(7)
+    ax = plt.axes(projection='3d', adjustable='box')
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+
+    drawRefSystem(ax, np.eye(4,4), '-', 'W')
+    drawRefSystem(ax, T_wa_wb_gt @ T_w_c1, '-', 'C1_B')
+    drawRefSystem(ax, T_wa_wb_gt @ T_w_c2, '-', 'C2_B')
+    drawRefSystem(ax, T_w_c2, '-', 'C2_A')
+
+    drawRefSystem(ax, T_wa_wb_op @ T_w_c1, '-', 'C1_B_Op')
+    drawRefSystem(ax, T_wa_wb_op @ T_w_c2, '-', 'C2_B_Op')
+
+    ax.scatter(points_3d_op[0, :], points_3d_op[1, :], points_3d_op[2, :], c='r', marker='x', s=10)
+
+    ax.scatter(points_3d[:,0], points_3d[:,1], points_3d[:,2], c='b', marker='o', s=10)
+
+    plt.title('3D model Bundle Adjustment')
+    plt.show()
+
+
 
