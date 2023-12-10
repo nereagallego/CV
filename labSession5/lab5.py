@@ -140,7 +140,6 @@ def triangulation(x1, x2, T_w_c1, T_w_c2, K1, K2, D1, D2, T_c1_c2):
          -output:
              X: Triangulated points.
          """
-    X = []
 
     v1 = kannalaBrandtUnprojection(K1, D1, x1.T)
     v2 = kannalaBrandtUnprojection(K2, D2, x2.T)
@@ -148,7 +147,6 @@ def triangulation(x1, x2, T_w_c1, T_w_c2, K1, K2, D1, D2, T_c1_c2):
     points_3d = []
     v1 = v1.squeeze()
     v2 = v2.squeeze()
-    print(v1.shape)
     for i in range(v1.shape[0]):
         p_s1 = np.array([[-v1[i,1]], [v1[i,0]], [0], [0]], dtype=np.float32)
         p_s1 = p_s1 / np.linalg.norm(p_s1)
@@ -162,8 +160,6 @@ def triangulation(x1, x2, T_w_c1, T_w_c2, K1, K2, D1, D2, T_c1_c2):
         p_s1_2 = T_c1_c2.T @ p_s1
         p_p1_2 = T_c1_c2.T @ p_p1
 
-
-
         A = np.array([p_s1_2.T,p_p1_2.T,p_s2.T,p_p2.T], dtype=np.float32)
         A = A.squeeze()
 
@@ -171,7 +167,6 @@ def triangulation(x1, x2, T_w_c1, T_w_c2, K1, K2, D1, D2, T_c1_c2):
 
         points = V.T[:, -1]
 
-        # print(points)
         points_3d.append(points/points[3])
 
     return np.array(points_3d)
@@ -187,25 +182,6 @@ def crossMatrix(x):
     return M
 
 def resBundleProjection_n_cameras(Op, xData, nPoints, K1, K2, D1, D2, T_w_c1, T_w_c2):
-    """
-    -input:
-    Op: Optimization parameters: this must include a
-    paramtrization for T_21 (reference 1 seen from reference 2)
-    in a proper way and for X1 (3D points in ref 1)
-    x1Data: (3xnPoints) 2D points on image 1 (homogeneous
-    coordinates)
-    x2Data: (3xnPoints) 2D points on image 2 (homogeneous
-    coordinates)
-    K_c: (3x3) Intrinsic calibration matrix
-    nPoints: Number of points
-    -output:
-    res: residuals from the error between the 2D matched points
-    and the projected points from the 3D points
-    (2 equations/residuals per 2D point)
-
-    ASSUMING AT LEAST 3 CAMERAS !!!
-    """
-
     '''
     Op[0:3] -> tx, ty, tz (camera 2 in advance)
     Op[3:6] -> Rx,Ry,Rz
@@ -234,13 +210,7 @@ def resBundleProjection_n_cameras(Op, xData, nPoints, K1, K2, D1, D2, T_w_c1, T_
     x4 = xData[9:12, :] / xData[11, :]
 
     res = np.concatenate((x1[0:2,:].T - x1_p[:,0:2], x2[0:2,:].T - x2_p[:,0:2], x3[0:2,:].T - x3_p[:,0:2], x4[0:2,:].T - x4_p[:,0:2]), axis=0)
-    return res.flatten()
-    
-
-    
-
-    
-
+    return res.flatten()  
 
 if __name__ == '__main__':
     Kc_1 = np.loadtxt('K_1.txt')
@@ -276,21 +246,16 @@ if __name__ == '__main__':
 
     X = np.array([[3,2,10,1], [-5,6,7,1],[1,5,14,1]])
     u1 = kannalaBrandtProjection(Kc_1, d1, X)
-    # print('u1 = ', u1)
 
     u2 = kannalaBrandtProjection(Kc_2, d2, X)
-    # print('u2 = ', u2)
 
     u = np.array([[503.387,450.1594,1], [267.9465,580.4671,1],[441.0609,493.0671,1]])
     X1 = kannalaBrandtUnprojection(Kc_1, d1, u)
-    # print('X1 = ', X1)
 
     X2 = kannalaBrandtUnprojection(Kc_2, d2, u)
-    # print('X2 = ', X2)
 
     # 2.2
     points_3d = triangulation(x1, x2, T_w_c1, T_w_c2, Kc_1, Kc_2, d1, d2, T_l_r)
-    # print('points_3d = ', points_3d)
 
     print(points_3d.shape)
     points_3d_1 = (T_l_r @ points_3d.T).T
@@ -339,7 +304,6 @@ if __name__ == '__main__':
     
 
     Op = np.hstack((t_wa_wb_seed, crossMatrixInv(sc.linalg.logm(R_wa_wb_seed)), points_3d[:,0:3].flatten()))
-    # print(Op)
 
     OpOptim = scOptim.least_squares(resBundleProjection_n_cameras, Op, args=(np.concatenate((x1,x2, x3,x4), axis=0), x1.shape[1], Kc_1, Kc_2, d1, d2, T_w_c1, T_w_c2), method='lm', verbose=2)
 
