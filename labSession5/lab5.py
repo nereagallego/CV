@@ -342,7 +342,6 @@ if __name__ == '__main__':
     # print(Op)
 
     OpOptim = scOptim.least_squares(resBundleProjection_n_cameras, Op, args=(np.concatenate((x1,x2, x3,x4), axis=0), x1.shape[1], Kc_1, Kc_2, d1, d2, T_w_c1, T_w_c2), method='lm', verbose=2)
-    print(OpOptim.x)
 
     # Print 3D model
     R_wa_wb_op = sc.linalg.expm(crossMatrix(OpOptim.x[3:6]))
