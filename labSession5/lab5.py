@@ -226,8 +226,8 @@ if __name__ == '__main__':
     x3 = np.loadtxt('x3.txt')
     x4 = np.loadtxt('x4.txt')
 
-    T_wa_wb_gt = np.loadtxt('T_wawb_gt.txt')
-    T_wa_wb_seed = np.loadtxt('T_wawb_seed.txt')
+    T_wa_wb_gt = np.loadtxt('T_wAwB_gt.txt')
+    T_wa_wb_seed = np.loadtxt('T_wAwB_seed.txt')
     T_w_c1 = np.loadtxt('T_wc1.txt')
     T_w_c2 = np.loadtxt('T_wc2.txt')
     T_l_r = np.loadtxt('T_leftRight.txt')
@@ -257,12 +257,9 @@ if __name__ == '__main__':
     # 2.2
     points_3d = triangulation(x1, x2, T_w_c1, T_w_c2, Kc_1, Kc_2, d1, d2, T_l_r)
 
-    print(points_3d.shape)
     points_3d_1 = (T_l_r @ points_3d.T).T
     x1_p = kannalaBrandtProjection(Kc_1, d1, points_3d_1)
     x2_p = kannalaBrandtProjection(Kc_2, d2, points_3d)
-    print(x1_p.shape)
-    print(x2_p.shape)
 
 
     fig, ax = plt.subplots(1, 2, figsize=(10, 5))
