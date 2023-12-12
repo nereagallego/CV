@@ -324,7 +324,7 @@ if __name__ == '__main__':
     drawRefSystem(ax, np.eye(4,4), '-', 'W')
     drawRefSystem(ax, T_wa_wb_gt @ T_w_c1, '-', 'C1_B')
     drawRefSystem(ax, T_wa_wb_gt @ T_w_c2, '-', 'C2_B')
-    drawRefSystem(ax, T_w_c2, '-', 'C2_A')
+    # drawRefSystem(ax, T_w_c2, '-', 'C2_A')
 
     drawRefSystem(ax, T_wa_wb_op @ T_w_c1, '-', 'C1_B_Op')
     drawRefSystem(ax, T_wa_wb_op @ T_w_c2, '-', 'C2_B_Op')
