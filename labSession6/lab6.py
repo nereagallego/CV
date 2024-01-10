@@ -105,12 +105,14 @@ def normalized_cross_correlation(patch: np.array, search_area: np.array) -> np.a
     margin_y = int(patch.shape[0]/2)
     margin_x = int(patch.shape[1]/2)
 
+    # print(margin_y, margin_x, search_area.shape[0] - margin_y, search_area.shape[1] - margin_x)
     for i in range(margin_y, search_area.shape[0] - margin_y):
         for j in range(margin_x, search_area.shape[1] - margin_x):
             i1 = search_area[i-margin_x:i + margin_x + 1, j-margin_y:j + margin_y + 1]
             i1_mean = np.mean(i1)
             # Implement the correlation
-            result[i, j] = np.sum((i0 - i0_mean) * (i1 - i1_mean)) / (np.sqrt(np.sum((i0 - i0_mean) ** 2)) * np.sqrt(np.sum((i1 - i1_mean) ** 2)))
+            result[i, j] = np.sum((i0 - i0_mean) * (i1 - i1_mean)) / (np.sqrt(np.sum((i0 - i0_mean) ** 2)) * np.sqrt(np.sum((i1 - i1_mean) ** 2))) if (np.sqrt(np.sum((i0 - i0_mean) ** 2)) * np.sqrt(np.sum((i1 - i1_mean) ** 2))) != 0 else 0
+            # print(result[i, j])
 
     return result
 
@@ -118,12 +120,19 @@ def normalized_cross_correlation(patch: np.array, search_area: np.array) -> np.a
 def seed_estimation_NCC_single_point(img1_gray, img2_gray, i_img, j_img, patch_half_size: int = 5, searching_area_size: int = 100):
 
     # Attention!! we are not checking the padding
+    # print(img1_gray.shape)
+    # print(i_img, j_img)
+    # print(i_img - patch_half_size, i_img + patch_half_size + 1, j_img - patch_half_size, j_img + patch_half_size + 1)
     patch = img1_gray[i_img - patch_half_size:i_img + patch_half_size + 1, j_img - patch_half_size:j_img + patch_half_size + 1]
+
+    # print(patch.shape)
 
     i_ini_sa = i_img - int(searching_area_size / 2)
     i_end_sa = i_img + int(searching_area_size / 2) + 1
     j_ini_sa = j_img - int(searching_area_size / 2)
     j_end_sa = j_img + int(searching_area_size / 2) + 1
+
+    # print(i_ini_sa, i_end_sa, j_ini_sa, j_end_sa)
 
     search_area = img2_gray[i_ini_sa:i_end_sa, j_ini_sa:j_end_sa]
     result = normalized_cross_correlation(patch, search_area)
@@ -199,6 +208,7 @@ def lucas_kanade_refinement(img1_gray, img2_gray, points_selected, seed_optical_
         print("Processing point " + str(k) + " of " + str(points_selected.shape[0]))
         # Extract the patch around the point in the first image
         i, j = points_selected[k,1], points_selected[k,0]
+        print(i, j)
         coord_patch0 = np.zeros((patch_half_size * 2 + 1, patch_half_size * 2 + 1, 2))
         for i_patch in range(-patch_half_size, patch_half_size + 1):
             for j_patch in range(-patch_half_size, patch_half_size + 1):
@@ -213,17 +223,17 @@ def lucas_kanade_refinement(img1_gray, img2_gray, points_selected, seed_optical_
         # Compute the image gradients within the patch
         # grad_i, grad_j = np.gradient(patch0)
         gradient = numerical_gradient(img1_gray, coord_patch0)
-        print(gradient.shape)
+        # print(gradient.shape)
         grad_i = gradient[:, 1]
         grad_j = gradient[:, 0]
 
         # Compute the Jacobian matrix from the image gradients
-        J = np.array([grad_i.flatten(), grad_j.flatten()]).T
-        print(J.shape)
+
+        # print(J.shape)
 
         # Compute matrix A from the Jacobian matrix
         A = np.array([[np.sum(grad_i ** 2), np.sum(grad_i * grad_j)], [np.sum(grad_i * grad_j), np.sum(grad_j ** 2)]])
-        print(A.shape)
+        # print(A.shape)
 
         # Check if A is invertible calculating its determinant
         detA = np.linalg.det(A)
@@ -231,13 +241,15 @@ def lucas_kanade_refinement(img1_gray, img2_gray, points_selected, seed_optical_
             print("A is not invertible")
             continue
         
-        print(A)
+        # print(A)
 
         epsilon = 1e-6
         delta_u = np.ones(optical_flow.shape[1])
         u = optical_flow[k, :]
         # Iterate until convergence
         while np.sqrt(np.sum(delta_u ** 2)) > epsilon:
+            if k == 489:
+                print("Iteration " + str(np.sqrt(np.sum(delta_u ** 2))))
 
             # Compute the patch in the second image
             # u = optical_flow[k, :]
@@ -256,7 +268,7 @@ def lucas_kanade_refinement(img1_gray, img2_gray, points_selected, seed_optical_
 
             # Update the optical flow
             u = u + delta_u
-            print(u)
+            # print(u)
         optical_flow[k, :] = np.array([u[1], u[0]])
             
     return optical_flow
@@ -324,3 +336,5 @@ if __name__ == '__main__':
 
     axs[1].title.set_text('Error with respect to GT')
     plt.show()    
+
+       
