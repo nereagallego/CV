@@ -16,6 +16,7 @@
 
 import numpy as np
 import cv2 as cv
+import matplotlib.pyplot as plt
 
 def read_image(filename: str, ):
     """
@@ -134,23 +135,95 @@ def seed_estimation_NCC_single_point(img1_gray, img2_gray, i_img, j_img, patch_h
 
     return i_flow, j_flow
 
+def numerical_gradient(img_int: np.array, point: np.array)->np.array:
+    """
+    https://es.wikipedia.org/wiki/Interpolaci%C3%B3n_bilineal
+    :param img:image to interpolate
+    :param point: [[y0,x0],[y1,x1], ... [yn,xn]]
+    :return: Ix_y = [[Ix_0,Iy_0],[Ix_1,Iy_1], ... [Ix_n,Iy_n]]
+    """
+
+    a = np.zeros((point.shape[0], 2), dtype= float)
+    filter = np.array([-1, 0, 1], dtype=float)
+    point_int = point.astype(int)
+    img = img_int.astype(float)
+
+    for i in range(0,point.shape[0]):
+        py = img[point_int[i,0]-1:point_int[i,0]+2,point_int[i,1]].astype(float)
+        px = img[point_int[i,0],point_int[i,1]-1:point_int[i,1]+2].astype(float)
+        a[i, 0] = 1/2*np.dot(filter,px)
+        a[i, 1] = 1/2*np.dot(filter,py)
+
+    return a
+
+def int_bilineal(img: np.array, point: np.array)->np.array:
+    """
+    https://es.wikipedia.org/wiki/Interpolaci%C3%B3n_bilineal
+    Vq = scipy.ndimage.map_coordinates(img.astype(np.float), [point[:, 0].ravel(), point[:, 1].ravel()], order=1, mode='nearest').reshape((point.shape[0],))
+
+    :param img:image to interpolate
+    :param point: point subpixel
+    point = [[y0,x0],[y1,x1], ... [yn,xn]]
+    :return: [gray0,gray1, .... grayn]
+    """
+    A = np.zeros((point.shape[0], 2, 2), dtype=float)
+    point_lu = point.astype(int)
+    point_ru = np.copy(point_lu)
+    point_ru[:,1] = point_ru[:,1] + 1
+    point_ld = np.copy(point_lu)
+    point_ld[:, 0] = point_ld[:, 0] + 1
+    point_rd = np.copy(point_lu)
+    point_rd[:, 0] = point_rd[:, 0] + 1
+    point_rd[:, 1] = point_rd[:, 1] + 1
+
+    A[:, 0, 0] = img[point_lu[:,0],point_lu[:,1]]
+    A[:, 0, 1] = img[point_ru[:,0],point_ru[:,1]]
+    A[:, 1, 0] = img[point_ld[:,0],point_ld[:,1]]
+    A[:, 1, 1] = img[point_rd[:,0],point_rd[:,1]]
+    l_u = np.zeros((point.shape[0],1,2),dtype= float)
+    l_u[:, 0, 0] = -((point[:,0]-point_lu[:,0])-1)
+    l_u[:, 0, 1] = point[:,0]-point_lu[:,0]
+
+    r_u = np.zeros((point.shape[0],2,1),dtype= float)
+    r_u[:, 0, 0] = -((point[:,1]-point_lu[:,1])-1)
+    r_u[:, 1, 0] = point[:, 1]-point_lu[:,1]
+    grays = l_u @ A @ r_u
+
+    return grays.reshape((point.shape[0],))
+
 def lucas_kanade_refinement(img1_gray, img2_gray, points_selected, seed_optical_flow_sparse, patch_half_size):
     # Initialize the optical flow vectors with the sparse optical flow estimation
     optical_flow = seed_optical_flow_sparse.copy()
 
-    for k in range(points_selected.shape[0]):
+    for k in range(0, points_selected.shape[0]):
+        print("Processing point " + str(k) + " of " + str(points_selected.shape[0]))
         # Extract the patch around the point in the first image
         i, j = points_selected[k,1], points_selected[k,0]
-        patch0 = img1_gray[i - patch_half_size:i + patch_half_size + 1, j - patch_half_size:j + patch_half_size + 1]
+        coord_patch0 = np.zeros((patch_half_size * 2 + 1, patch_half_size * 2 + 1, 2))
+        for i_patch in range(-patch_half_size, patch_half_size + 1):
+            for j_patch in range(-patch_half_size, patch_half_size + 1):
+                coord_patch0[i_patch + patch_half_size, j_patch + patch_half_size, :] = np.array([i + i_patch, j + j_patch])
+        # coord_patch0 = coord_patch0.astype(int)
+        coord_patch0 = coord_patch0.reshape((coord_patch0.shape[0] * coord_patch0.shape[1], coord_patch0.shape[2]))
+        patch0 = int_bilineal(img1_gray, coord_patch0)
+        print(patch0.shape)
+        # print(patch0)
+        # patch0 = img1_gray[i - patch_half_size:i + patch_half_size + 1, j - patch_half_size:j + patch_half_size + 1]
 
         # Compute the image gradients within the patch
-        grad_i, grad_j = np.gradient(patch0)
+        # grad_i, grad_j = np.gradient(patch0)
+        gradient = numerical_gradient(img1_gray, coord_patch0)
+        print(gradient.shape)
+        grad_i = gradient[:, 1]
+        grad_j = gradient[:, 0]
 
         # Compute the Jacobian matrix from the image gradients
-        J = np.array([grad_j.flatten(), grad_i.flatten()]).T
+        J = np.array([grad_i.flatten(), grad_j.flatten()]).T
+        print(J.shape)
 
         # Compute matrix A from the Jacobian matrix
-        A = J.T @ J
+        A = np.array([[np.sum(grad_i ** 2), np.sum(grad_i * grad_j)], [np.sum(grad_i * grad_j), np.sum(grad_j ** 2)]])
+        print(A.shape)
 
         # Check if A is invertible calculating its determinant
         detA = np.linalg.det(A)
@@ -160,31 +233,43 @@ def lucas_kanade_refinement(img1_gray, img2_gray, points_selected, seed_optical_
         
         print(A)
 
+        epsilon = 1e-6
+        delta_u = np.ones(optical_flow.shape[1])
+        u = optical_flow[k, :]
         # Iterate until convergence
-        while True:
+        while np.sqrt(np.sum(delta_u ** 2)) > epsilon:
 
             # Compute the patch in the second image
-            i_flow, j_flow = optical_flow[k, :]
-            i_flow = int(i_flow)
-            j_flow = int(j_flow)
-            patch1 = img2_gray[i - patch_half_size + i_flow:i + patch_half_size + 1 + i_flow, j - patch_half_size + j_flow:j + patch_half_size + 1 + j_flow]
-            
+            # u = optical_flow[k, :]
+            coord_patch1 = coord_patch0 + u
+            patch1 = int_bilineal(img2_gray, coord_patch1)
+            # patch1 = img2_gray[i - patch_half_size + int(u[0]):i + patch_half_size + 1 + int(u[0]), j - patch_half_size + int(u[1]):j + patch_half_size + 1 + int(u[1])]
+
             # Compute the error between the two patches
             error = patch1 - patch0
 
             # Compute the optical flow increment
-            b = J.T @ error.flatten()
+            b = np.array([-np.sum(grad_i * error), -np.sum(grad_j * error)])
 
             # Solve the linear system
-            delta_optical_flow = np.linalg.inv(A) @ b
+            delta_u = np.linalg.solve(A, b)
 
             # Update the optical flow
-            optical_flow[k, :] += delta_optical_flow
+            u = u + delta_u
+            print(u)
+        optical_flow[k, :] = np.array([u[1], u[0]])
             
     return optical_flow
 
 if __name__ == '__main__':
     np.set_printoptions(precision=4, linewidth=1024, suppress=True)
+    unknownFlowThresh = 1e9
+
+    flow_12 = read_flo_file("flow10.flo", verbose=True)
+    binUnknownFlow = flow_12 > unknownFlowThresh
+
+    # Adding random noise to the gt optical flow for plotting example
+    flow_est = flow_12 * np.bitwise_not(binUnknownFlow) + np.random.rand(flow_12.shape[0], flow_12.shape[1], flow_12.shape[2]) * 1.2 - 0.6
 
     img1 = read_image("frame10.png")
     img2 = read_image("frame11.png")
@@ -208,5 +293,34 @@ if __name__ == '__main__':
 
     # Refine with Lucas Kanade
     optical_flow = lucas_kanade_refinement(img1_gray, img2_gray, points_selected, seed_optical_flow_sparse, template_size_half)
-    
-        
+
+    flow_gt = flow_12[points_selected[:, 1].astype(int), points_selected[:, 0].astype(int)].astype(float)
+    flow_error = optical_flow - flow_gt
+    # flow_error[binUnknownFlow] = 0
+    error_norm = np.sqrt(np.sum(flow_error ** 2, axis=-1))
+
+    print(flow_gt)
+    print(optical_flow)
+    flow_est_sparse = optical_flow
+    flow_est_sparse_norm = np.sqrt(np.sum(flow_est_sparse ** 2, axis=1))
+    error_sparse = flow_est_sparse - flow_gt
+    error_sparse_norm = np.sqrt(np.sum(error_sparse ** 2, axis=1))
+
+    # Plot results for sparse optical flow
+    fig, axs = plt.subplots(1, 2)
+    axs[0].imshow(img1)
+    axs[0].plot(points_selected[:, 0], points_selected[:, 1], '+r', markersize=15)
+    for k in range(points_selected.shape[0]):
+        axs[0].text(points_selected[k, 0] + 5, points_selected[k, 1] + 5, '{:.2f}'.format(flow_est_sparse_norm[k]), color='r')
+    axs[0].quiver(points_selected[:, 0], points_selected[:, 1], flow_est_sparse[:, 0], flow_est_sparse[:, 1], color='b', angles='xy', scale_units='xy', scale=0.05)
+    axs[0].title.set_text('Optical flow')
+    axs[1].imshow(img1)
+    axs[1].plot(points_selected[:, 0], points_selected[:, 1], '+r', markersize=15)
+    for k in range(points_selected.shape[0]):
+        axs[1].text(points_selected[k, 0] + 5, points_selected[k, 1] + 5, '{:.2f}'.format(error_sparse_norm[k]),
+                    color='r')
+    axs[1].quiver(points_selected[:, 0], points_selected[:, 1], error_sparse[:, 0], error_sparse[:, 1], color='b',
+               angles='xy', scale_units='xy', scale=0.05)
+
+    axs[1].title.set_text('Error with respect to GT')
+    plt.show()    
